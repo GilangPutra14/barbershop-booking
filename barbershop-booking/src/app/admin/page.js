@@ -6,25 +6,21 @@ export default function AdminDashboard() {
   const [appointments, setAppointments] = useState([]);
   const [barbers, setBarbers] = useState([]);
   const [services, setServices] = useState([]);
-  const [history, setHistory] = useState([]); // State baru untuk riwayat
+  const [history, setHistory] = useState([]); 
+  const [blockedSlots, setBlockedSlots] = useState([]); // State baru untuk daftar jam diblokir
   
-  // State Input
+  // State Input Utama
   const [newBarberName, setNewBarberName] = useState('');
   const [newBarberRole] = useState('Senior Barber');
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration] = useState('45 Menit');
 
-  // // State Baru untuk Mengatur Jadwal Hari & Jam Kerja Kapster
-  // const [workingHours, setWorkingHours] = useState([
-  //   { day: 'Monday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Tuesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Wednesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Thursday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Friday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Saturday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  //   { day: 'Sunday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  // ]);
+  // State Input Fitur Jam Tidak Tersedia (Block Time)
+  const [selectedBarber, setSelectedBarber] = useState('');
+  const [blockDay, setBlockDay] = useState('Monday');
+  const [blockStartTime, setBlockStartTime] = useState('12:00');
+  const [blockEndTime, setBlockEndTime] = useState('13:00');
 
   const [, setIsLoading] = useState(true);
 
@@ -34,14 +30,21 @@ export default function AdminDashboard() {
       if (resApps.ok) setAppointments(await resApps.json());
 
       const resBarbers = await fetch('/api/barbers');
-      if (resBarbers.ok) setBarbers(await resBarbers.json());
+      if (resBarbers.ok) {
+        const barbersData = await resBarbers.json();
+        setBarbers(barbersData);
+        if (barbersData.length > 0 && !selectedBarber) setSelectedBarber(barbersData[0]._id);
+      }
 
       const resServices = await fetch('/api/services');
       if (resServices.ok) setServices(await resServices.json());
 
-      // Menarik data riwayat menggunakan method PUT
       const resHistory = await fetch('/api/appointments', { method: 'PUT' });
       if (resHistory.ok) setHistory(await resHistory.json());
+
+      // MEMANGGIL DATA JAM BLOKIR DARI API BACKEND
+      const resBlocked = await fetch('/api/blocked-slots');
+      if (resBlocked.ok) setBlockedSlots(await resBlocked.json());
     } catch (error) {
       console.error(error);
     } finally {
@@ -51,27 +54,17 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAllData(); }, []);
 
-  // // Handler untuk mendeteksi perubahan checkbox hari atau rentang waktu jam
-  // const handleScheduleChange = (index, field, value) => {
-  //   const updatedHours = [...workingHours];
-  //   updatedHours[index][field] = value;
-  //   setWorkingHours(updatedHours);
-  // };
-
-  // FUNGSI SELESAI ANTREAN DENGAN INPUT KAPSTER
+  // FUNGSI SELESAI ANTREAN
   const handleComplete = async (id) => {
     const barberName = prompt("Siapa nama kapster yang menyelesaikan orderan ini?");
-    
     if (barberName === null) return; 
     if (barberName.trim() === "") {
       alert("Nama kapster wajib diisi untuk menyelesaikan antrean!");
       return;
     }
-
     const res = await fetch(`/api/appointments?id=${id}&completedBy=${encodeURIComponent(barberName)}`, { 
       method: 'DELETE' 
     });
-    
     if (res.ok) {
       alert("Antrean sukses dipindahkan ke riwayat!");
       loadAllData();
@@ -114,6 +107,64 @@ export default function AdminDashboard() {
     }
   };
 
+  // Fungsi Handler Simpan Jam Blokir ke API Backend
+  const handleSaveUnavailableTime = async (e) => {
+    e.preventDefault();
+    if (!selectedBarber) {
+      alert("Silakan pilih kapster terlebih dahulu!");
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/blocked-slots', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          barberId: selectedBarber,
+          day: blockDay,
+          startTime: blockStartTime,
+          endTime: blockEndTime
+        }),
+      });
+
+      if (res.ok) {
+        alert("Jam kerja kapster berhasil diblokir!");
+        setBlockStartTime('12:00');
+        setBlockEndTime('13:00');
+        loadAllData(); // Refresh data agar langsung muncul di tabel bawah
+      } else {
+        const errorData = await res.json();
+        alert(`Gagal: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Terjadi kesalahan sistem saat menghubungi server.");
+    }
+  };
+
+  // FUNGSI MENGHAPUS BLOKIR JAM DARI BACKEND
+  const handleDeleteBlockedSlot = async (id) => {
+    if (confirm('Buka kembali jam booking yang diblokir ini?')) {
+      const res = await fetch(`/api/blocked-slots?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        alert("Jam booking berhasil dibuka kembali!");
+        loadAllData();
+      }
+    }
+  };
+
+  // Helper untuk menerjemahkan nama objek Barber ID ke nama String teks asli kapster
+  const getBarberName = (id) => {
+    const found = barbers.find(b => b._id === id);
+    return found ? found.name : 'Kapster tidak diketahui';
+  };
+
+  // Helper konversi nama Hari bahasa Inggris ke bahasa Indonesia
+  const translateDay = (day) => {
+    const days = { Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu', Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu', Sunday: 'Minggu' };
+    return days[day] || day;
+  };
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-12">
@@ -124,26 +175,17 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold font-serif text-amber-500">Dashboard Admin Premium v4</h1>
             <p className="text-neutral-400 text-sm mt-1">Sistem Manajemen Kasir & Riwayat Kerja Kapster.</p>
           </div>
-          
-          {/* SINKRONISASI JAM DAN TOMBOL BERJEJER RAPI KE SAMPING */}
           <div className="flex items-center gap-4">
             <RealtimeClock />
             <div className="flex gap-2">
-              <a href="/" className="bg-neutral-900 border border-neutral-800 text-xs px-4 py-2 rounded-md text-neutral-400 font-medium transition hover:bg-neutral-800">
-                Lihat Beranda
-              </a>
-              <button 
-                onClick={() => { document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"; window.location.href = '/login'; }} 
-                className="bg-red-600/10 border border-red-500/20 text-red-500 text-xs px-4 py-2 rounded-md font-medium transition hover:bg-red-600/20"
-              >
-                🔒 Logout
-              </button>
+              <a href="/" className="bg-neutral-900 border border-neutral-800 text-xs px-4 py-2 rounded-md text-neutral-400 font-medium transition hover:bg-neutral-800">Lihat Beranda</a>
+              <button onClick={() => { document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"; window.location.href = '/login'; }} className="bg-red-600/10 border border-red-500/20 text-red-500 text-xs px-4 py-2 rounded-md font-medium transition hover:bg-red-600/20">🔒 Logout</button>
             </div>
           </div>
         </div>
 
         {/* PANELS (KAPSTER & LAYANAN) */}
-        <div className="grid md:grid-cols-2 gap-8 border-b border-neutral-900 pb-8">
+        <div className="grid md:grid-cols-2 gap-8">
           {/* Kapster */}
           <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
             <h2 className="text-lg font-bold text-amber-500">✂️ Kelola Kapster</h2>
@@ -153,7 +195,7 @@ export default function AdminDashboard() {
             </form>
             <div className="max-h-32 overflow-y-auto space-y-2">
               {barbers.map(b => (
-                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{b.name} <button onClick={() => handleDeleteBarber(b._id)} className="text-red-400">❌</button></div>
+                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{b.name} <button type="button" onClick={() => handleDeleteBarber(b._id)} className="text-red-400">❌</button></div>
               ))}
             </div>
           </div>
@@ -168,8 +210,113 @@ export default function AdminDashboard() {
             </form>
             <div className="max-h-32 overflow-y-auto space-y-2">
               {services.map(s => (
-                <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button onClick={() => handleDeleteService(s._id)} className="text-red-400">❌</button></div>
+                <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button type="button" onClick={() => handleDeleteService(s._id)} className="text-red-400">❌</button></div>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* PANEL PENGATURAN JAM TIDAK TERSEDIA KAPSTER */}
+        <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
+          <h2 className="text-lg font-bold text-amber-500">🔒 Atur Jam Istirahat / Blokir Jam Kerja Kapster</h2>
+          <p className="text-xs text-neutral-400">Tentukan rentang jam di mana pelanggan tidak dapat melakukan booking pada kapster tertentu.</p>
+          
+          <form onSubmit={handleSaveUnavailableTime} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Pilih Kapster</label>
+              <select 
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-200"
+                value={selectedBarber}
+                onChange={(e) => setSelectedBarber(e.target.value)}
+              >
+                {barbers.map(b => (
+                  <option key={b._id} value={b._id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-neutral-400 mb-1">Hari</label>
+              <select 
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-200"
+                value={blockDay}
+                onChange={(e) => setBlockDay(e.target.value)}
+              >
+                <option value="Monday">Senin</option>
+                <option value="Tuesday">Selasa</option>
+                <option value="Wednesday">Rabu</option>
+                <option value="Thursday">Kamis</option>
+                <option value="Friday">Jumat</option>
+                <option value="Saturday">Sabtu</option>
+                <option value="Sunday">Minggu</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1">Mulai Dari</label>
+                <input 
+                  type="time" 
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-200"
+                  value={blockStartTime}
+                  onChange={(e) => setBlockStartTime(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-400 mb-1">Sampai Dengan</label>
+                <input 
+                  type="time" 
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-200"
+                  value={blockEndTime}
+                  onChange={(e) => setBlockEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold p-2 rounded-lg text-xs transition">
+              Blokir Jam Booking
+            </button>
+          </form>
+
+          {/* TABEL DAFTAR JAM YANG SEDANG DIBLOKIR */}
+          <div className="pt-4 border-t border-neutral-800">
+            <h3 className="text-sm font-bold text-amber-500 mb-2">📋 Daftar Slot Jam Terkunci Saat Ini</h3>
+            <div className="bg-neutral-950 border border-neutral-800 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+              {blockedSlots.length === 0 ? (
+                <div className="p-4 text-center text-neutral-500 text-xs">Belum ada jam kerja kapster yang diblokir.</div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-neutral-900 text-neutral-400 uppercase font-mono text-[10px]">
+                    <tr>
+                      <th className="p-3">Nama Kapster</th>
+                      <th className="p-3">Hari</th>
+                      <th className="p-3">Rentang Waktu</th>
+                      <th className="p-3 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-neutral-800/40">
+                    {blockedSlots.map((slot) => (
+                      <tr key={slot._id} className="hover:bg-neutral-900/30">
+                        <td className="p-3 text-neutral-200 font-medium">{getBarberName(slot.barberId)}</td>
+                        <td className="p-3 text-neutral-400">{translateDay(slot.day)}</td>
+                        <td className="p-3">
+                          <span className="text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/10 font-mono">
+                            {slot.startTime} - {slot.endTime}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button 
+                            onClick={() => handleDeleteBlockedSlot(slot._id)} 
+                            className="text-red-400 bg-red-500/5 hover:bg-red-500/10 px-2 py-1 rounded transition border border-red-500/10 text-[11px]"
+                          >
+                            🔓 Buka Blokir
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

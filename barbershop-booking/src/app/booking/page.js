@@ -1,12 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
 
-
 export default function BookingPage() {
   const [formData, setFormData] = useState({
     name: '',
-    service: 'Classic Haircut',
-    barber: 'Fadholi (Senior)',
+    service: '',
+    barber: 'Siapa Saja (Ketersediaan Tercepat)',
     date: '',
     time: '',
   });
@@ -14,29 +13,39 @@ export default function BookingPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [dbBarbers, setDbBarbers] = useState([]);
   const [dbServices, setDbServices] = useState([]);
-
-// Ambil daftar kapster dinamis saat halaman dibuka
-  useEffect(() => {
-    async function getBarbers() {
-      const res = await fetch('/api/barbers');
-      if (res.ok) setDbBarbers(await res.json());
-    }
-    getBarbers();
-  }, []);
-
-   useEffect(() => {
-     async function getData() {
-       const resBarbers = await fetch('/api/barbers');
-       if (resBarbers.ok) setDbBarbers(await resBarbers.json());
-
-       const resServices = await fetch('/api/services');
-       if (resServices.ok) setDbServices(await resServices.json());
-     }
-     getData();
-   }, []);
+  const [blockedSlots, setBlockedSlots] = useState([]); // State baru untuk data jam terkunci
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Sinkronisasi Pengambilan Data Master (Barber, Service, & Blocked Slots) dalam 1 Effect
+  useEffect(() => {
+    async function getData() {
+      try {
+        const resBarbers = await fetch('/api/barbers');
+        if (resBarbers.ok) setDbBarbers(await resBarbers.json());
+
+        const resServices = await fetch('/api/services');
+        if (resServices.ok) {
+          const servicesData = await resServices.json();
+          setDbServices(servicesData);
+          // Set default service dari data pertama jika tersedia
+          if (servicesData.length > 0) {
+            setFormData(prev => ({
+              ...prev,
+              service: `${servicesData[0].name} (Rp ${servicesData[0].price.toLocaleString('id-ID')})`
+            }));
+          }
+        }
+
+        const resBlocked = await fetch('/api/blocked-slots');
+        if (resBlocked.ok) setBlockedSlots(await resBlocked.json());
+      } catch (error) {
+        console.error("Gagal memuat data awal:", error);
+      }
+    }
+    getData();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,6 +53,38 @@ export default function BookingPage() {
     setErrorMessage('');
 
     try {
+      // 1. Dapatkan nama hari berdasarkan tanggal yang dipilih oleh pelanggan
+      const selectedDate = new Date(formData.date);
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const selectedDayName = daysOfWeek[selectedDate.getDay()];
+
+      // 2. Ekstrak data nama kapster murni dari value pilihan (karena format dropdown: "Nama (Role)")
+      let selectedBarberId = null;
+      if (formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)') {
+        const matchedBarber = dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber);
+        if (matchedBarber) selectedBarberId = matchedBarber._id;
+      }
+
+      // 3. Validasi Logika Penguncian Waktu (Jam Istirahat/Blokir)
+      if (selectedBarberId) {
+        const isTimeBlocked = blockedSlots.some(slot => {
+          // Cocokkan ID Kapster dan Hari Kerja terlebih dahulu
+          if (slot.barberId === selectedBarberId && slot.day === selectedDayName) {
+            const timeVal = formData.time; // Format 'HH:MM'
+            // Periksa apakah waktu booking berada di antara startTime dan endTime blokir
+            return timeVal >= slot.startTime && timeVal <= slot.endTime;
+          }
+          return false;
+        });
+
+        if (isTimeBlocked) {
+          setErrorMessage(`Maaf, kapster pilihan Anda sedang tidak tersedia (Jam Istirahat/Blokir) pada rentang jam tersebut untuk tanggal ${formData.date}. Silakan pilih jam atau kapster lain.`);
+          setIsLoading(false);
+          return; // Hentikan proses pengiriman data booking
+        }
+      }
+
+      // 4. Proses Kirim Data ke API Jika Lolos Validasi Jam Kerja
       const response = await fetch('/api/appointments', {
         method: 'POST',
         headers: {
@@ -59,14 +100,6 @@ export default function BookingPage() {
       } else {
         setErrorMessage(result.message || 'Gagal mengirim data booking.');
       }
-      {
-        /* Tambahkan kode peringatan ini di dalam src/app/booking/page.js */}
-{errorMessage && (
-  <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm mb-4">
-    ⚠️ {errorMessage}
-  </div>
-)}
-
     } catch (error) {
       setErrorMessage('Koneksi internet bermasalah atau server mati.');
     } finally {
@@ -105,11 +138,13 @@ export default function BookingPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-           {errorMessage && (
-  <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm font-medium">
-    ⚠️ {errorMessage}
-  </div>
-)}
+            
+            {/* Tampilan Peringatan Error Jika Jam Kerja Terkunci */}
+            {errorMessage && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm font-medium">
+                ⚠️ {errorMessage}
+              </div>
+            )}
 
             {/* Input Nama */}
             <div>
@@ -128,73 +163,70 @@ export default function BookingPage() {
             <div>
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Layanan</label>
               <select 
-    className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-    value={formData.service}
-    onChange={(e) => setFormData({...formData, service: e.target.value})}
-  >
-    {dbServices.length === 0 ? (
-      <option>Memuat layanan...</option>
-    ) : (
-      dbServices.map((s) => (
-        <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>
-          {s.name} - Rp {s.price.toLocaleString('id-ID')} ({s.duration})
-        </option>
-      ))
-    )}
-  </select>
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
+                value={formData.service}
+                onChange={(e) => setFormData({...formData, service: e.target.value})}
+              >
+                {dbServices.length === 0 ? (
+                  <option>Memuat layanan...</option>
+                ) : (
+                  dbServices.map((s) => (
+                    <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>
+                      {s.name} - Rp {s.price.toLocaleString('id-ID')} ({s.duration})
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
 
             {/* Pilih Kapster */}
-<div>
-  <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Kapster</label>
-  <select
-    className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-    value={formData.barber}
-    onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
-  >
-    <option value="Siapa Saja (Ketersediaan Tercepat)">Siapa Saja (Ketersediaan Tercepat)</option>
-    {dbBarbers && dbBarbers.map((b) => (
-      <option key={b._id} value={`${b.name} (${b.role})`}>
-        {b.name} ({b.role})
-      </option>
-    ))}
-  </select>
-</div>
-
+            <div>
+              <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Kapster</label>
+              <select
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
+                value={formData.barber}
+                onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
+              >
+                <option value="Siapa Saja (Ketersediaan Tercepat)">Siapa Saja (Ketersediaan Tercepat)</option>
+                {dbBarbers && dbBarbers.map((b) => (
+                  <option key={b._id} value={`${b.name} (${b.role})`}>
+                    {b.name} ({b.role})
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Tanggal & Jam */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Tanggal</label>
                 <input 
-  type="date" 
-  required
-  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-  value={formData.date}
-  onChange={(e) => setFormData({...formData, date: e.target.value})}
-/>
-
+                  type="date" 
+                  required
+                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                  value={formData.date}
+                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Jam Slot</label>
                 <input 
-  type="time" 
-  required
-  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-  value={formData.time}
-  onChange={(e) => setFormData({...formData, time: e.target.value})}
-/>
-
+                  type="time" 
+                  required
+                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                  value={formData.time}
+                  onChange={(e) => setFormData({...formData, time: e.target.value})}
+                />
               </div>
             </div>
 
             {/* Tombol Submit */}
             <button 
               type="submit" 
-              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-wide shadow-lg shadow-amber-500/10 transition duration-300 mt-4"
+              disabled={isLoading}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-wide shadow-lg shadow-amber-500/10 transition duration-300 mt-4 disabled:bg-amber-700"
             >
               {isLoading ? 'MEMPROSES...' : 'KONFIRMASI JADWAL'}
-
             </button>
           </form>
         )}
