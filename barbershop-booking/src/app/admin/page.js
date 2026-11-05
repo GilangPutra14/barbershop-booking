@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import RealtimeClock from '@/components/RealtimeClock';
 
 export default function AdminDashboard() {
   const [appointments, setAppointments] = useState([]);
@@ -9,25 +10,23 @@ export default function AdminDashboard() {
   
   // State Input
   const [newBarberName, setNewBarberName] = useState('');
-  const [newBarberRole, setNewBarberRole] = useState('Senior Barber');
+  const [newBarberRole] = useState('Senior Barber');
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
-  const [newServiceDuration, setNewServiceDuration] = useState('45 Menit');
+  const [newServiceDuration] = useState('45 Menit');
 
-  // State Baru untuk Mengatur Jadwal Hari & Jam Kerja Kapster
-  const [workingHours, setWorkingHours] = useState([
-    { day: 'Monday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Tuesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Wednesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Thursday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Friday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Saturday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-    { day: 'Sunday', isChecked: false, startTime: '09:00', endTime: '17:00' },
-  ]);
+  // // State Baru untuk Mengatur Jadwal Hari & Jam Kerja Kapster
+  // const [workingHours, setWorkingHours] = useState([
+  //   { day: 'Monday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Tuesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Wednesday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Thursday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Friday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Saturday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  //   { day: 'Sunday', isChecked: false, startTime: '09:00', endTime: '17:00' },
+  // ]);
 
-  const [isLoading, setIsLoading] = useState(true);
-
-  
+  const [, setIsLoading] = useState(true);
 
   async function loadAllData() {
     try {
@@ -52,19 +51,18 @@ export default function AdminDashboard() {
 
   useEffect(() => { loadAllData(); }, []);
 
-  // Handler untuk mendeteksi perubahan checkbox hari atau rentang waktu jam
-  const handleScheduleChange = (index, field, value) => {
-    const updatedHours = [...workingHours];
-    updatedHours[index][field] = value;
-    setWorkingHours(updatedHours);
-  };
+  // // Handler untuk mendeteksi perubahan checkbox hari atau rentang waktu jam
+  // const handleScheduleChange = (index, field, value) => {
+  //   const updatedHours = [...workingHours];
+  //   updatedHours[index][field] = value;
+  //   setWorkingHours(updatedHours);
+  // };
 
   // FUNGSI SELESAI ANTREAN DENGAN INPUT KAPSTER
   const handleComplete = async (id) => {
-    // Meminta admin mengetik/memilih nama kapster penanggung jawab
     const barberName = prompt("Siapa nama kapster yang menyelesaikan orderan ini?");
     
-    if (barberName === null) return; // Jika admin klik cancel
+    if (barberName === null) return; 
     if (barberName.trim() === "") {
       alert("Nama kapster wajib diisi untuk menyelesaikan antrean!");
       return;
@@ -91,7 +89,7 @@ export default function AdminDashboard() {
     if (res.ok) { setNewBarberName(''); loadAllData(); }
   };
 
-  const handle領leteBarber = async (id) => {
+  const handleDeleteBarber = async (id) => {
     if (confirm('Hapus kapster ini?')) {
       const res = await fetch(`/api/barbers?id=${id}`, { method: 'DELETE' });
       if (res.ok) loadAllData();
@@ -109,7 +107,7 @@ export default function AdminDashboard() {
     if (res.ok) { setNewServiceName(''); setNewServicePrice(''); loadAllData(); }
   };
 
-  const handle領leteService = async (id) => {
+  const handleDeleteService = async (id) => {
     if (confirm('Hapus layanan ini?')) {
       const res = await fetch(`/api/services?id=${id}`, { method: 'DELETE' });
       if (res.ok) loadAllData();
@@ -126,9 +124,21 @@ export default function AdminDashboard() {
             <h1 className="text-3xl font-bold font-serif text-amber-500">Dashboard Admin Premium v4</h1>
             <p className="text-neutral-400 text-sm mt-1">Sistem Manajemen Kasir & Riwayat Kerja Kapster.</p>
           </div>
-          <div className="flex gap-2">
-            <a href="/" className="bg-neutral-900 border border-neutral-800 text-xs px-4 py-2 rounded-md text-neutral-400 font-medium transition">Lihat Beranda</a>
-            <button onClick={() => { document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"; window.location.href = '/login'; }} className="bg-red-600/10 border border-red-500/20 text-red-500 text-xs px-4 py-2 rounded-md font-medium transition">🔒 Logout</button>
+          
+          {/* SINKRONISASI JAM DAN TOMBOL BERJEJER RAPI KE SAMPING */}
+          <div className="flex items-center gap-4">
+            <RealtimeClock />
+            <div className="flex gap-2">
+              <a href="/" className="bg-neutral-900 border border-neutral-800 text-xs px-4 py-2 rounded-md text-neutral-400 font-medium transition hover:bg-neutral-800">
+                Lihat Beranda
+              </a>
+              <button 
+                onClick={() => { document.cookie = "admin_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;"; window.location.href = '/login'; }} 
+                className="bg-red-600/10 border border-red-500/20 text-red-500 text-xs px-4 py-2 rounded-md font-medium transition hover:bg-red-600/20"
+              >
+                🔒 Logout
+              </button>
+            </div>
           </div>
         </div>
 
@@ -143,7 +153,7 @@ export default function AdminDashboard() {
             </form>
             <div className="max-h-32 overflow-y-auto space-y-2">
               {barbers.map(b => (
-                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{b.name} <button onClick={() => handle領leteBarber(b._id)} className="text-red-400">❌</button></div>
+                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{b.name} <button onClick={() => handleDeleteBarber(b._id)} className="text-red-400">❌</button></div>
               ))}
             </div>
           </div>
@@ -158,7 +168,7 @@ export default function AdminDashboard() {
             </form>
             <div className="max-h-32 overflow-y-auto space-y-2">
               {services.map(s => (
-                <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button onClick={() => handle領leteService(s._id)} className="text-red-400">❌</button></div>
+                <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button onClick={() => handleDeleteService(s._id)} className="text-red-400">❌</button></div>
               ))}
             </div>
           </div>
@@ -213,29 +223,28 @@ export default function AdminDashboard() {
                     <th className="p-4">Status</th>
                   </tr>
                 </thead>
-                  <tbody className="divide-y divide-neutral-800/50">
-                    {history.map((item, idx) => (
-  <tr key={idx} className="bg-emerald-950/5 hover:bg-emerald-950/10 transition">
-    <td className="p-4 text-neutral-300 font-medium">{item.name}</td>
-    <td className="p-4 text-neutral-400">{item.service}</td>
-    <td className="p-4">
-      <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-md border border-emerald-500/20 font-bold">
-        🪒 {item.completedBy}
-      </span>
-    </td>
-    <td className="p-4">
-      <span className="text-emerald-500 text-xs font-bold uppercase tracking-wider">🟢 Sukses</span>
-    </td>
-  </tr>
-))}
+                <tbody className="divide-y divide-neutral-800/50">
+                  {history.map((item, idx) => (
+                    <tr key={idx} className="bg-emerald-950/5 hover:bg-emerald-950/10 transition">
+                      <td className="p-4 text-neutral-300 font-medium">{item.name}</td>
+                      <td className="p-4 text-neutral-400">{item.service}</td>
+                      <td className="p-4">
+                        <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-md border border-emerald-500/20 font-bold">
+                          🪒 {item.completedBy}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-emerald-500 text-xs font-bold uppercase tracking-wider">🟢 Sukses</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
 
-        </tbody>
-      </table>
-    )}
-  </div>
-</div>
-
-</div>
-</div>
+      </div>
+    </div>
   );
 }
