@@ -1,1 +1,1 @@
-website development for offering in-home services or booking a place in a queue online
+Membuat layanan pemesanan atrean barbershop dan menyediakan layanan home service terhadap pelanggan 
