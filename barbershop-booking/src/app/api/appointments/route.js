@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '@/lib/db'; // Menggunakan helper lib/db sesuai konfigurasi proyek Anda
+import clientPromise from '@/lib/db'; 
 import { ObjectId } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
@@ -20,58 +20,85 @@ export async function GET() {
   }
 }
 
-// 2. POST: Menyimpan data booking baru beserta file bukti QRIS dari customer
-export async function POST(request) {
+// 2. POST: Menyimpan data booking baru secara fleksibel (JSON & FormData)
+ export async function POST(request) {
   try {
     const client = await clientPromise;
     const db = client.db('barbershop');
     
-    // Membaca data sebagai FormData karena ada unggahan file gambar
-    const formData = await request.formData();
+    const contentType = request.headers.get("content-type") || "";
     
-    const name = formData.get('name');
-    const service = formData.get('service');
-    const barber = formData.get('barber');
-    const date = formData.get('date');
-    const time = formData.get('time');
-    const paymentMethod = formData.get('paymentMethod');
-    const file = formData.get('paymentProof');
-
-    if (!name || !service || !barber || !date || !time || !paymentMethod) {
-      return NextResponse.json({ message: 'Semua kolom wajib diisi!' }, { status: 400 });
-    }
-
+    // Variabel penampung data formulir
+    let name, service, barber, date, time, paymentMethod, file;
     let paymentProofUrl = null;
 
-    // Jika metode QRIS dan ada file yang diunggah, proses penyimpanan file
+    if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+      // JALUR 1: Jika frontend mengirim FormData (Unggah Bukti QRIS)
+      const formData = await request.formData();
+      name = formData.get('name');
+      service = formData.get('service');
+      barber = formData.get('barber');
+      date = formData.get('date');
+      time = formData.get('time');
+      paymentMethod = formData.get('paymentMethod');
+      file = formData.get('paymentProof');
+    } else {
+      // JALUR 2: Jika frontend mengirim JSON biasa (Metode Tunai)
+      const json = await request.json();
+      name = json.name;
+      service = json.service;
+      barber = json.barber;
+      date = json.date;
+      time = json.time;
+      paymentMethod = json.paymentMethod;
+      paymentProofUrl = json.paymentProofUrl || null;
+    }
+
+    // ==========================================
+    // OTOMATISASI DAN PENJAGAAN KETAT BILA DATA WAKTU KOSONG
+    // ==========================================
+    if (!date) {
+      date = new Date().toISOString().split('T')[0]; // Menghasilkan format otomatis YYYY-MM-DD
+    }
+    if (!time) {
+      const sekarang = new Date();
+      const jam = String(sekarang.getHours()).padStart(2, '0');
+      const menit = String(sekarang.getMinutes()).padStart(2, '0');
+      time = `${jam}:${menit}`; // Menghasilkan format otomatis HH:MM
+    }
+
+    // Validasi Integritas Data Inti (Nama, Layanan, dan Kapster wajib ada)
+    if (!name || !service || !barber) {
+      return NextResponse.json({ message: 'Kolom nama, layanan, dan kapster wajib diisi!' }, { status: 400 });
+    }
+
+    // Pemrosesan File Gambar Fisik untuk jalur QRIS
     if (paymentMethod === 'QRIS' && file && typeof file !== 'string') {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Membuat folder penyimpanan 'public/uploads' jika belum ada
       const uploadDir = path.join(process.cwd(), 'public', 'uploads');
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
-      // Membuat nama unik untuk file agar tidak bentrok (contoh: 1718293812-bukti.png)
       const fileExtension = path.extname(file.name) || '.png';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 7)}${fileExtension}`;
       const filePath = path.join(uploadDir, fileName);
 
-      // Menulis file ke disk lokal server
       fs.writeFileSync(filePath, buffer);
-      paymentProofUrl = `/uploads/${fileName}`; // Jalur URL yang bisa diakses di browser
+      paymentProofUrl = `/uploads/${fileName}`; 
     }
 
+    // Menyusun objek dokumen akhir untuk disave ke MongoDB
     const newAppointment = {
       name,
       service,
       barber,
       date,
       time,
-      paymentMethod,
-      paymentProofUrl, // Menyimpan link gambar bukti transfer
+      paymentMethod: paymentMethod || 'Tunai',
+      paymentProofUrl, 
       status: 'Active',
       createdAt: new Date()
     };
@@ -85,25 +112,24 @@ export async function POST(request) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Server Error:', error);
-    return NextResponse.json({ message: 'Terjadi kesalahan internal pada server' }, { status: 500 });
+    console.error("Gagal memproses booking:", error);
+    return NextResponse.json({ error: "Terjadi kesalahan internal server" }, { status: 500 });
   }
 }
 
-// 3. PUT: Mengambil riwayat booking yang HANYA diselesaikan HARI INI (Otomatis Reset Setiap Hari)
+
+// 3. PUT: Mengambil riwayat booking yang HANYA diselesaikan HARI INI
 export async function PUT() {
   try {
     const client = await clientPromise;
     const db = client.db('barbershop');
     
-    // Tentukan waktu mulai hari ini (00:00:00) dan akhir hari ini (23:59:59)
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
     
-    // Ambil data riwayat yang kolom 'completedAt'-nya berada dalam rentang hari ini saja
     const history = await db.collection('appointments_history')
       .find({
         completedAt: {
@@ -121,7 +147,6 @@ export async function PUT() {
   }
 }
 
-
 // 4. DELETE: Menyelesaikan antrean (Memindahkan antrean aktif ke koleksi riwayat)
 export async function DELETE(request) {
   try {
@@ -136,25 +161,21 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'ID antrean dan nama kapster wajib diisi!' }, { status: 400 });
     }
 
-    // 1. Cari data antrean aktif yang ingin diselesaikan
     const appointment = await db.collection('appointments').findOne({ _id: new ObjectId(id) });
     
     if (!appointment) {
       return NextResponse.json({ error: 'Data antrean tidak ditemukan!' }, { status: 404 });
     }
 
-    // 2. Masukkan data tersebut ke dalam tabel riwayat (appointments_history)
     const historyData = {
       ...appointment,
       completedBy,
       completedAt: new Date(),
       status: 'Completed'
     };
-    delete historyData._id; // Hapus ID lama agar dibuatkan ID baru di tabel riwayat
+    delete historyData._id; 
 
     await db.collection('appointments_history').insertOne(historyData);
-
-    // 3. Hapus dari tabel antrean aktif
     await db.collection('appointments').deleteOne({ _id: new ObjectId(id) });
 
     return NextResponse.json({ success: true, message: 'Antrean berhasil diselesaikan!' }, { status: 200 });

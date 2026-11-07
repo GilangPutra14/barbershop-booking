@@ -15,29 +15,54 @@ export async function GET() {
 }
 
 // 2. TAMBAH KAPSTER BARU
+
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { name, role } = body;
-
-    if (!name || !role) {
-      return NextResponse.json({ message: 'Nama dan peran wajib diisi!' }, { status: 400 });
-    }
-
     const client = await clientPromise;
     const db = client.db('barbershop');
+    
+    // 🟢 Ambil data name, role, image, dan specialty dari frontend
+    const { name, role, image, specialty } = await request.json(); 
 
-    const result = await db.collection('barbers').insertOne({
-      name,
-      role,
-      createdAt: new Date()
+    const result = await db.collection('barbers').insertOne({ 
+      name, 
+      role, 
+      image: image || 'https://unsplash.com',
+      specialty: specialty || 'Haircut Expert', // 🟢 Simpan keahlian asli
+      createdAt: new Date() 
     });
 
-    return NextResponse.json({ message: 'Kapster berhasil ditambahkan!', id: result.insertedId }, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: 'Gagal menambahkan kapster.' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+
+
+// export async function POST(request) {
+//   try {
+//     const body = await request.json();
+//     const { name, role } = body;
+
+//     if (!name || !role) {
+//       return NextResponse.json({ message: 'Nama dan peran wajib diisi!' }, { status: 400 });
+//     }
+
+//     const client = await clientPromise;
+//     const db = client.db('barbershop');
+
+//     const result = await db.collection('barbers').insertOne({
+//       name,
+//       role,
+//       createdAt: new Date()
+//     });
+
+//     return NextResponse.json({ message: 'Kapster berhasil ditambahkan!', id: result.insertedId }, { status: 201 });
+//   } catch (error) {
+//     return NextResponse.json({ message: 'Gagal menambahkan kapster.' }, { status: 500 });
+//   }
+// }
 
 // 3. HAPUS/KURANGI KAPSTER
 export async function DELETE(request) {
@@ -56,5 +81,41 @@ export async function DELETE(request) {
     return NextResponse.json({ message: 'Kapster berhasil dihapus!' }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: 'Gagal menghapus kapster.' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request) {
+  try {
+    const client = await clientPromise;
+    const db = client.db('barbershop');
+    
+    // Ambil parameter id dari query URL (?id=...)
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID Kapster wajib disertakan' }, { status: 400 });
+    }
+
+    const { name, specialty, image } = await request.json();
+    
+    // Siapkan objek data yang akan diperbarui
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (specialty) updateData.specialty = specialty;
+    if (image) updateData.image = image;
+
+    const result = await db.collection('barbers').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateData }
+    );
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: 'Kapster tidak ditemukan' }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: 'Data kapster berhasil diperbarui!' }, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -244,10 +244,10 @@ export default function BookingPage() {
     barber: 'Siapa Saja (Ketersediaan Tercepat)',
     date: '',
     time: '',
-    paymentMethod: 'Tunai', // Default pembayaran Tunai
+    paymentMethod: 'Tunai',
   });
 
-  const [paymentProof, setPaymentProof] = useState(null); // State khusus untuk file bukti pembayaran
+  const [paymentProof, setPaymentProof] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [dbBarbers, setDbBarbers] = useState([]);
   const [dbServices, setDbServices] = useState([]);
@@ -255,7 +255,6 @@ export default function BookingPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
   useEffect(() => {
     async function getData() {
       try {
@@ -266,6 +265,8 @@ export default function BookingPage() {
         if (resServices.ok) {
           const servicesData = await resServices.json();
           setDbServices(servicesData);
+          
+          // PERBAIKAN: Menambahkan indeks [0] agar membaca objek data pertama dengan benar
           if (servicesData.length > 0) {
             setFormData(prev => ({
               ...prev,
@@ -281,7 +282,8 @@ export default function BookingPage() {
       }
     }
     getData();
-  }, []);
+  }, []); // PERBAIKAN: Menambahkan array dependensi kosong agar tidak loop terus-menerus
+
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -296,10 +298,14 @@ export default function BookingPage() {
     }
   };
 
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log("Data yang akan dikirim ke backend:", formData);
+    
     setIsLoading(true);
     setErrorMessage('');
+    // setIsLoading(true);
+    // setErrorMessage('');
 
     if (formData.paymentMethod === 'QRIS' && !paymentProof) {
       setErrorMessage('Harap unggah bukti pembayaran valid Anda terlebih dahulu untuk metode QRIS.');
@@ -363,7 +369,6 @@ export default function BookingPage() {
       setIsLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 px-6 py-12 font-sans flex items-center justify-center">
       <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 p-8 rounded-2xl shadow-xl">
@@ -396,53 +401,40 @@ export default function BookingPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            
             {errorMessage && (
               <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm font-medium">
                 ⚠️ {errorMessage}
               </div>
             )}
 
-            {/* Input Nama */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Nama Lengkap</label>
               <input 
-                type="text" 
-                required
-                placeholder="Masukkan nama Anda"
+                type="text" required placeholder="Masukkan nama Anda"
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
               />
             </div>
 
-            {/* Pilih Layanan */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Layanan</label>
               <select 
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-                value={formData.service}
-                onChange={(e) => setFormData({...formData, service: e.target.value})}
+                value={formData.service} onChange={(e) => setFormData({...formData, service: e.target.value})}
               >
-                {dbServices.length === 0 ? (
-                  <option>Memuat layanan...</option>
-                ) : (
-                  dbServices.map((s) => (
-                    <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>
-                      {s.name} - Rp {s.price.toLocaleString('id-ID')} ({s.duration})
-                    </option>
-                  ))
-                )}
+                {dbServices.length === 0 ? <option>Memuat layanan...</option> : dbServices.map((s) => (
+                  <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>
+                    {s.name} - Rp {s.price.toLocaleString('id-ID')} ({s.duration})
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Pilih Kapster */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Kapster</label>
               <select
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-                value={formData.barber}
-                onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
+                value={formData.barber} onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
               >
                 <option value="Siapa Saja (Ketersediaan Tercepat)">Siapa Saja (Ketersediaan Tercepat)</option>
                 {dbBarbers && dbBarbers.map((b) => (
@@ -453,31 +445,23 @@ export default function BookingPage() {
               </select>
             </div>
 
-            {/* Tanggal & Jam */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Tanggal</label>
                 <input 
-                  type="date" 
-                  required
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                  value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  type="date" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                  value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Jam Slot</label>
                 <input 
-                  type="time" 
-                  required
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                  value={formData.time}
-                  onChange={(e) => setFormData({...formData, time: e.target.value})}
+                  type="time" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                  value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})}
                 />
               </div>
             </div>
 
-            {/* PILIHAN METODE PEMBAYARAN */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Metode Pembayaran</label>
               <div className="grid grid-cols-2 gap-4">
@@ -492,11 +476,10 @@ export default function BookingPage() {
               </div>
             </div>
 
-            {/* BOX KONDISIONAL APABILA PILIH QRIS */}
             {formData.paymentMethod === 'QRIS' && (
-              <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-4 animate-fadeIn">
-                <div className="flex flex-col items-center p-2 bg-white rounded-lg max-w-[220px] mx-auto">
-                  <img src="/qris-code.png" alt="QRIS Barbershop Code" className="w-full h-auto aspect-square object-contain" onError={(e)=>{e.target.src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=NMID_BARBER_PREMIUM";}} />
+              <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-4">
+                <div className="flex flex-col items-center p-2 bg-white rounded-lg max-w-[200px] mx-auto">
+                  <img src="https://qrserver.com" alt="QRIS Code" className="w-full h-auto aspect-square object-contain" />
                   <span className="text-[10px] text-neutral-800 font-bold tracking-wider mt-1">NMID : BARBER_PREMIUM</span>
                 </div>
                 <p className="text-center text-xs text-neutral-400 px-4">Silakan pindai QRIS di atas untuk melakukan transfer pembayaran sesuai harga layanan.</p>
@@ -504,21 +487,16 @@ export default function BookingPage() {
                 <div className="pt-2 border-t border-neutral-800">
                   <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Unggah Bukti Transaksi Valid</label>
                   <input 
-                    type="file" 
-                    required={formData.paymentMethod === 'QRIS'}
-                    accept="image/*"
-                    onChange={handleFileChange}
+                    type="file" required={formData.paymentMethod === 'QRIS'} accept="image/*" onChange={handleFileChange}
                     className="w-full text-xs text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-neutral-950 hover:file:bg-amber-600 cursor-pointer"
                   />
-                  <p className="text-[10px] text-neutral-500 mt-1">Format dokumen yang diizinkan: JPG, JPEG, PNG</p>
                 </div>
               </div>
             )}
 
-            {/* Tombol Submit */}
             <button 
-              type="submit" 
-              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-wide shadow-lg shadow-amber-500/10 transition duration-300 mt-4"
+              type="submit" disabled={isLoading}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-wide shadow-lg transition duration-300 mt-4 disabled:bg-amber-700"
             >
               {isLoading ? 'MEMPROSES...' : 'KONFIRMASI JADWAL'}
             </button>
