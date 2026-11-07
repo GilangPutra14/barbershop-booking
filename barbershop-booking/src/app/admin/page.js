@@ -15,14 +15,21 @@ export default function AdminDashboard() {
   const [newServiceName, setNewServiceName] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceDuration] = useState('45 Menit');
+  const [newBarberImage, setNewBarberImage] = useState('');
+  const [newBarberSpecialty, setNewBarberSpecialty] = useState('');
 
   // State Input Fitur Jam Tidak Tersedia (Block Time)
   const [selectedBarber, setSelectedBarber] = useState('');
   const [blockDay, setBlockDay] = useState('Monday');
   const [blockStartTime, setBlockStartTime] = useState('12:00');
   const [blockEndTime, setBlockEndTime] = useState('13:00');
-
   const [, setIsLoading] = useState(true);
+
+  // State untuk Fitur Edit Kapster
+  const [editingBarber, setEditingBarber] = useState(null); 
+  const [editName, setEditName] = useState('');
+  const [editSpecialty, setEditSpecialty] = useState('');
+  const [editImage, setEditImage] = useState('');
 
   async function loadAllData() {
     try {
@@ -75,12 +82,87 @@ export default function AdminDashboard() {
   const handleAddBarber = async (e) => {
     e.preventDefault();
     if (!newBarberName) return;
+    
     const res = await fetch('/api/barbers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newBarberName, role: newBarberRole }),
+      body: JSON.stringify({ 
+        name: newBarberName, 
+        role: newBarberRole,
+        image: newBarberImage || 'https://unsplash.com',
+        specialty: newBarberSpecialty || 'Haircut Expert'
+      }),
     });
-    if (res.ok) { setNewBarberName(''); loadAllData(); }
+    
+    if (res.ok) { 
+      setNewBarberName(''); 
+      setNewBarberImage('');
+      setNewBarberSpecialty(''); 
+      loadAllData(); 
+    }
+  };
+
+  // Fungsi pembaca file gambar saat tambah kapster baru
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { 
+        alert("Ukuran berkas terlalu besar! Maksimal 1MB.");
+        e.target.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewBarberImage(reader.result); 
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Fungsi pembaca file gambar saat EDIT profil kapster
+  const handleEditFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1024 * 1024) {
+        alert("Ukuran berkas terlalu besar! Maksimal 1MB.");
+        e.target.value = "";
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => setEditImage(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Mengirim data pembaruan ke API Backend PATCH
+  const handleUpdateBarber = async (e) => {
+    e.preventDefault();
+    if (!editName) return;
+
+    const res = await fetch(`/api/barbers?id=${editingBarber._id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editName,
+        specialty: editSpecialty,
+        image: editImage
+      }),
+    });
+
+    if (res.ok) {
+      alert("Profil kapster berhasil diperbarui!");
+      setEditingBarber(null); 
+      loadAllData(); 
+    } else {
+      alert("Gagal memperbarui data.");
+    }
+  };
+
+  const startEditBarber = (barber) => {
+    setEditingBarber(barber);
+    setEditName(barber.name);
+    setEditSpecialty(barber.specialty || '');
+    setEditImage(barber.image || '');
   };
 
   const handleDeleteBarber = async (id) => {
@@ -153,6 +235,7 @@ export default function AdminDashboard() {
   };
 
   const getBarberName = (id) => {
+    if (!barbers || !Array.isArray(barbers)) return 'Kapster tidak diketahui';
     const found = barbers.find(b => b._id === id);
     return found ? found.name : 'Kapster tidak diketahui';
   };
@@ -162,7 +245,6 @@ export default function AdminDashboard() {
     return days[day] || day;
   };
 
-  // Helper untuk mengambil angka harga dari string layanan
   const extractPrice = (serviceString) => {
     if (!serviceString) return 0;
     const match = serviceString.match(/Rp\s*([\d.]+)/);
@@ -172,20 +254,25 @@ export default function AdminDashboard() {
     return 0;
   };
 
-  // Logika akumulasi hitung omzet realtime dari riwayat sukses
-  const totalOmzet = history ? history.reduce((acc, curr) => acc + extractPrice(curr.service), 0) : 0;
-  const omzetTunai = history ? history.filter(item => item.paymentMethod === 'Tunai').reduce((acc, curr) => acc + extractPrice(curr.service), 0) : 0;
-  const omzetQris = history ? history.filter(item => item.paymentMethod === 'QRIS').reduce((acc, curr) => acc + extractPrice(curr.service), 0) : 0;
-  
-  // Menghitung berapa kali masing-masing metode pembayaran digunakan di riwayat
-  const jumlahTunai = history ? history.filter(item => item.paymentMethod === 'Tunai').length : 0;
-  const jumlahQris = history ? history.filter(item => item.paymentMethod === 'QRIS').length : 0;
+  // Proteksi Array Ketat
+  const validHistory = Array.isArray(history) ? history : [];
+  const validAppointments = Array.isArray(appointments) ? appointments : [];
+  const validBarbers = Array.isArray(barbers) ? barbers : [];
+  const validServices = Array.isArray(services) ? services : [];
+  const validBlockedSlots = Array.isArray(blockedSlots) ? blockedSlots : [];
+
+  const totalOmzet = validHistory.reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  const omzetTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  const omzetQris = validHistory.filter(item => item.paymentMethod === 'QRIS').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+
+  const jumlahTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').length;
+  const jumlahQris = validHistory.filter(item => item.paymentMethod === 'QRIS').length;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
         
-        {/* 1. HEADER (TETAP DI PALING ATAS, JAM & TOMBOL DI POJOK KANAN) */}
+        {/* 1. HEADER */}
         <div className="flex justify-between items-center border-b border-neutral-900 pb-6">
           <div>
             <h1 className="text-3xl font-bold font-serif text-amber-500">Dashboard Admin Boytax Barber</h1>
@@ -199,48 +286,6 @@ export default function AdminDashboard() {
             </div>
           </div>
         </div>
-
-        {/* 2. KARTU OMZET DI BAWAH HEADER & DI ATAS KELOLA KAPSTER 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl shadow-md">
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">💰 Total Pendapatan Hari Ini</p>
-            <h3 className="text-2xl font-bold font-mono text-amber-500 mt-2">Rp {totalOmzet.toLocaleString('id-ID')}</h3>
-            <p className="text-[10px] text-neutral-500 mt-1">Akumulasi seluruh transaksi sukses.</p>
-          </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl shadow-md">
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">💵 Pendapatan Kasir (Tunai)</p>
-            <h3 className="text-2xl font-bold font-mono text-emerald-500 mt-2">Rp {omzetTunai.toLocaleString('id-ID')}</h3>
-            <p className="text-[10px] text-emerald-400/80 font-medium mt-1">✓ Berhasil: {jumlahTunai} Transaksi</p>
-          </div>
-          <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-2xl shadow-md">
-            <p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">📱 Pendapatan Bank (QRIS)</p>
-            <h3 className="text-2xl font-bold font-mono text-cyan-400 mt-2">Rp {omzetQris.toLocaleString('id-ID')}</h3>
-            <p className="text-[10px] text-cyan-400/80 font-medium mt-1">✓ Berhasil: {jumlahQris} Transaksi</p>
-          </div>
-        </div>*/}
-
-        {/* Tombol Aksi Laporan (CETAK PDF BERUPA SCREENSOT TAMPILAN ADMIN)
-<div className="flex justify-between items-center mt-4">
-  <h2 className="text-xl font-bold font-serif text-amber-500">📈 Analisis & Performa Keuangan</h2>
-  <button 
-    onClick={() => window.print()} 
-    className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-2 transition duration-200 shadow-lg shadow-amber-500/10"
-  >
-    📄 Unduh Laporan PDF Hari Ini
-  </button>
-</div> */}
-
-{/* Tombol Cetak Dokumen Keuangan (CETAK LAPORAN BELUM FILE PDF)
-<div className="flex justify-between items-center mb-4">
-  <h2 className="text-xl font-bold font-serif text-amber-500">📊 Rekap Finansial Barbershop</h2>
-  <a 
-    href="/api/download-pdf" 
-    download
-    className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs font-sans transition tracking-wide flex items-center gap-1.5 shadow-md shadow-amber-500/10"
-  >
-    📥 Unduh Dokumen Rekap Harian
-  </a>
-</div*>/}
 
         {/* 2. MENU HUBUNGAN CETAK LAPORAN & RINGKASAN OMZET */}
         <div className="space-y-4">
@@ -278,19 +323,46 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-
         {/* 3. PANELS (KELOLA KAPSTER & LAYANAN) */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* Kapster */}
+          {/* Kelola Kapster Premium dengan Sistem Upload File */}
           <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-xl space-y-4">
             <h2 className="text-lg font-bold text-amber-500">✂️ Kelola Kapster</h2>
-            <form onSubmit={handleAddBarber} className="flex gap-2">
-              <input type="text" required placeholder="Nama Kapster" className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs" value={newBarberName} onChange={(e) => setNewBarberName(e.target.value)} />
-              <button type="submit" className="bg-amber-500 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs">Tambah</button>
+            <form onSubmit={handleAddBarber} className="flex flex-col gap-3">
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Nama Lengkap</label>
+                <input type="text" required placeholder="Contoh: Gilang Putra" className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-100" value={newBarberName} onChange={(e) => setNewBarberName(e.target.value)} />
+              </div>
+              
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Catatan Keahlian / Spesialisasi</label>
+                <input type="text" placeholder="Contoh: Fade & Pompadour Expert" className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-100" value={newBarberSpecialty} onChange={(e) => setNewBarberSpecialty(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Unggah Foto Profil (.jpg/.png)</label>
+                <input type="file" accept="image/*" required className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-1.5 text-xs text-neutral-400 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-amber-500 file:text-neutral-950 cursor-pointer" onChange={handleFileChange} />
+                <p className="text-[9px] text-neutral-500 mt-1">*Disarankan foto rasio kotak (1:1) dengan ukuran maksimal berkas 1MB.</p>
+              </div>
+
+              <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs self-end transition">Tambah Kapster</button>
             </form>
-            <div className="max-h-32 overflow-y-auto space-y-2">
-              {barbers && barbers.map(b => (
-                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{b.name} <button type="button" onClick={() => handleDeleteBarber(b._id)} className="text-red-400">❌</button></div>
+
+            <div className="max-h-40 overflow-y-auto space-y-2 mt-4 pt-2 border-t border-neutral-800/60">
+              {validBarbers.map(b => (
+                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <img src={b.image || 'https://unsplash.com'} alt="" className="w-8 h-8 rounded-full object-cover border border-neutral-800" />
+                    <div>
+                      <div className="font-semibold text-neutral-200">{b.name}</div>
+                      <div className="text-[9px] text-amber-500/80">{b.specialty || 'Haircut Expert'}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => startEditBarber(b)} className="text-amber-500 hover:text-amber-400 font-medium px-1">✏️</button>
+                    <button type="button" onClick={() => handleDeleteBarber(b._id)} className="text-red-400 hover:text-red-500 px-1">❌</button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -304,7 +376,7 @@ export default function AdminDashboard() {
               <button type="submit" className="bg-amber-500 text-neutral-950 font-bold rounded-lg text-xs">Tambah</button>
             </form>
             <div className="max-h-32 overflow-y-auto space-y-2">
-              {services && services.map(s => (
+              {validServices.map(s => (
                 <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button type="button" onClick={() => handleDeleteService(s._id)} className="text-red-400">❌</button></div>
               ))}
             </div>
@@ -324,7 +396,7 @@ export default function AdminDashboard() {
                 value={selectedBarber}
                 onChange={(e) => setSelectedBarber(e.target.value)}
               >
-                {barbers && barbers.map(b => (
+                {validBarbers.map(b => (
                   <option key={b._id} value={b._id}>{b.name}</option>
                 ))}
               </select>
@@ -377,7 +449,7 @@ export default function AdminDashboard() {
           <div className="mt-6 pt-4 border-t border-neutral-800">
             <h3 className="text-sm font-bold text-amber-500 mb-3">📋 Daftar Slot Jam Terkunci Saat Ini</h3>
             <div className="bg-neutral-950 border border-neutral-800 rounded-lg overflow-hidden max-h-40 overflow-y-auto">
-              {blockedSlots && blockedSlots.length === 0 ? (
+              {validBlockedSlots.length === 0 ? (
                 <div className="p-4 text-center text-neutral-600 text-xs">Belum ada jam kerja kapster yang diblokir.</div>
               ) : (
                 <table className="w-full text-left text-xs">
@@ -390,7 +462,7 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800">
-                    {blockedSlots && blockedSlots.map((slot) => (
+                    {validBlockedSlots.map((slot) => (
                       <tr key={slot._id} className="hover:bg-neutral-900/50">
                         <td className="p-2 text-neutral-200 font-medium">{getBarberName(slot.barberId)}</td>
                         <td className="p-2 text-neutral-400">{translateDay(slot.day)}</td>
@@ -411,7 +483,7 @@ export default function AdminDashboard() {
         <div className="space-y-4">
           <h2 className="text-xl font-bold font-serif text-amber-500">🗓️ Antrean Booking Aktif</h2>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-xl">
-            {appointments && appointments.length === 0 ? (
+            {validAppointments.length === 0 ? (
               <div className="p-8 text-center text-neutral-500 text-sm">Tidak ada antrean aktif.</div>
             ) : (
               <table className="w-full text-left text-sm">
@@ -425,7 +497,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800/50">
-                  {appointments && appointments.map((item) => (
+                  {validAppointments.map((item) => (
                     <tr key={item._id} className="hover:bg-neutral-950/40">
                       <td className="p-4 text-neutral-200">{item.name}</td>
                       <td className="p-4 text-neutral-400">{item.service}</td>
@@ -456,7 +528,7 @@ export default function AdminDashboard() {
         <div className="space-y-4 pt-6 border-t border-neutral-900">
           <h2 className="text-xl font-bold font-serif text-emerald-500">✅ Riwayat Pemotongan Selesai</h2>
           <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden shadow-xl">
-            {history && history.length === 0 ? (
+            {validHistory.length === 0 ? (
               <div className="p-8 text-center text-neutral-500 text-sm">Belum ada riwayat transaksi hari ini.</div>
             ) : (
               <table className="w-full text-left text-sm">
@@ -470,7 +542,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800/50">
-                  {history && history.map((item, idx) => (
+                  {validHistory.map((item, idx) => (
                     <tr key={idx} className="bg-emerald-950/5 hover:bg-emerald-950/10 transition">
                       <td className="p-4 text-neutral-300 font-medium">{item.name}</td>
                       <td className="p-4 text-neutral-400">{item.service}</td>
@@ -496,6 +568,43 @@ export default function AdminDashboard() {
         </div>
 
       </div>
+
+      {/* POPUP MODAL UNTUK EDIT DATA KAPSTER */}
+      {editingBarber && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-neutral-800 pb-2">
+              <h3 className="text-sm font-bold text-amber-500 uppercase tracking-wider">✏️ Edit Profil Kapster</h3>
+              <button type="button" onClick={() => setEditingBarber(null)} className="text-neutral-500 hover:text-neutral-300 font-mono text-sm">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateBarber} className="space-y-3">
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Nama Lengkap</label>
+                <input type="text" required className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-100" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Spesialisasi / Keahlian</label>
+                <input type="text" className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs text-neutral-100" value={editSpecialty} onChange={(e) => setEditSpecialty(e.target.value)} />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-neutral-400 mb-1 uppercase font-semibold">Ganti Foto Profil (Opsional)</label>
+                <div className="flex items-center gap-3 mt-1">
+                  <img src={editImage || 'https://unsplash.com'} alt="" className="w-10 h-10 rounded-full object-cover border border-neutral-800 bg-neutral-950" />
+                  <input type="file" accept="image/*" className="flex-1 bg-neutral-950 border border-neutral-800 rounded-lg p-1 text-[11px] text-neutral-400 file:mr-2 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[9px] file:bg-amber-500 file:text-neutral-950 cursor-pointer" onChange={handleEditFileChange} />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setEditingBarber(null)} className="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg text-xs font-semibold">Batal</button>
+                <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-neutral-950 px-4 py-1.5 rounded-lg text-xs font-bold">Simpan Perubahan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
