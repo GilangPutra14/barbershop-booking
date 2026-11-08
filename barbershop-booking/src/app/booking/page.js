@@ -255,7 +255,8 @@ export default function BookingPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  useEffect(() => {
+
+    useEffect(() => {
     async function getData() {
       try {
         const resBarbers = await fetch('/api/barbers');
@@ -265,8 +266,6 @@ export default function BookingPage() {
         if (resServices.ok) {
           const servicesData = await resServices.json();
           setDbServices(servicesData);
-          
-          // PERBAIKAN: Menambahkan indeks [0] agar membaca objek data pertama dengan benar
           if (servicesData.length > 0) {
             setFormData(prev => ({
               ...prev,
@@ -282,8 +281,7 @@ export default function BookingPage() {
       }
     }
     getData();
-  }, []); // PERBAIKAN: Menambahkan array dependensi kosong agar tidak loop terus-menerus
-
+  }, []);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -300,12 +298,8 @@ export default function BookingPage() {
 
     const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Data yang akan dikirim ke backend:", formData);
-    
     setIsLoading(true);
     setErrorMessage('');
-    // setIsLoading(true);
-    // setErrorMessage('');
 
     if (formData.paymentMethod === 'QRIS' && !paymentProof) {
       setErrorMessage('Harap unggah bukti pembayaran valid Anda terlebih dahulu untuk metode QRIS.');
@@ -314,32 +308,6 @@ export default function BookingPage() {
     }
 
     try {
-      const selectedDate = new Date(formData.date);
-      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const selectedDayName = daysOfWeek[selectedDate.getDay()];
-
-      let selectedBarberId = null;
-      if (formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)') {
-        const matchedBarber = dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber);
-        if (matchedBarber) selectedBarberId = matchedBarber._id;
-      }
-
-      if (selectedBarberId && blockedSlots.length > 0) {
-        const isTimeBlocked = blockedSlots.some(slot => {
-          if (slot.barberId === selectedBarberId && slot.day === selectedDayName) {
-            const timeVal = formData.time;
-            return timeVal >= slot.startTime && timeVal <= slot.endTime;
-          }
-          return false;
-        });
-
-        if (isTimeBlocked) {
-          setErrorMessage(`Maaf, kapster pilihan Anda sedang tidak tersedia pada rentang jam tersebut untuk tanggal ${formData.date}.`);
-          setIsLoading(false);
-          return;
-        }
-      }
-
       const dataToSend = new FormData();
       dataToSend.append('name', formData.name);
       dataToSend.append('service', formData.service);
@@ -434,32 +402,8 @@ export default function BookingPage() {
               <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Kapster</label>
               <select
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-                value={formData.barber} onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
+                value={formData.barber} onChange={(e) => setFormData({ ...formData, barber: e.target.value, time: '' })}
               >
-                {/* KOTAK DAFTAR JAM SIBUK REALTIME DI HALAMAN FORM BOOKING */}
-{blockedSlots && blockedSlots.length > 0 && formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)' && (
-  <div className="mt-2 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl space-y-2">
-    <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
-      📅 Jadwal Jam Istirahat / Sibuk Kapster Ini:
-    </p>
-    <div className="grid grid-cols-2 gap-2 max-h-28 overflow-y-auto">
-      {blockedSlots
-        .filter(slot => {
-          const matchedBarber = dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber);
-          return matchedBarber ? slot.barberId === matchedBarber._id : false;
-        })
-        .map((slot, idx) => {
-          const days = { Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu', Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu', Sunday: 'Minggu' };
-          return (
-            <div key={idx} className="bg-neutral-950 border border-neutral-800 p-2 rounded text-xs text-neutral-300 font-mono text-center">
-              {days[slot.day] || slot.day} • <span className="text-amber-500 font-bold">{slot.startTime}-{slot.endTime}</span>
-            </div>
-          );
-        })}
-    </div>
-  </div>
-)}
-
                 <option value="Siapa Saja (Ketersediaan Tercepat)">Siapa Saja (Ketersediaan Tercepat)</option>
                 {dbBarbers && dbBarbers.map((b) => (
                   <option key={b._id} value={`${b.name} (${b.role})`}>
@@ -474,15 +418,45 @@ export default function BookingPage() {
                 <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Tanggal</label>
                 <input 
                   type="date" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                  value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value, time: ''})}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Jam Slot</label>
-                <input 
-                  type="time" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                  value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})}
-                />
+                <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Jam Slot Tersedia</label>
+                <select 
+                  required
+                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
+                  value={formData.time}
+                  onChange={(e) => setFormData({...formData, time: e.target.value})}
+                  disabled={!formData.date}
+                >
+                  <option value="">-- Pilih Jam --</option>
+                  {formData.date && (() => {
+                    const listJam = [
+                      '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
+                      '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', 
+                      '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', 
+                      '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
+                    ];
+
+                    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const hariIni = days[new Date(formData.date).getDay()];
+
+                    let selectedBarberId = null;
+                    if (formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)') {
+                      const matchedBarber = dbBarbers ? dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber) : null;
+                      if (matchedBarber) selectedBarberId = matchedBarber._id;
+                    }
+
+                    const slotsSibuk = (blockedSlots && selectedBarberId) ? blockedSlots.filter(slot => 
+                      slot.barberId === selectedBarberId && slot.day === hariIni
+                    ) : [];
+
+                    return listJam
+                      .filter(jam => !slotsSibuk.some(slot => jam >= slot.startTime && jam <= slot.endTime))
+                      .map(jam => <option key={jam} value={jam}>{jam} WIB</option>);
+                  })()}
+                </select>
               </div>
             </div>
 
@@ -504,10 +478,9 @@ export default function BookingPage() {
               <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-4">
                 <div className="flex flex-col items-center p-2 bg-white rounded-lg max-w-[200px] mx-auto">
                   <img src="https://qrserver.com" alt="QRIS Code" className="w-full h-auto aspect-square object-contain" />
-                  <span className="text-[10px] text-neutral-800 font-bold tracking-wider mt-1">NMID : BARBER_PREMIUM</span>
+                  <span className="text-[10px] text-neutral-800 font-bold tracking-wider mt-1">NMID : BOYTAX_BARBER</span>
                 </div>
                 <p className="text-center text-xs text-neutral-400 px-4">Silakan pindai QRIS di atas untuk melakukan transfer pembayaran sesuai harga layanan.</p>
-                
                 <div className="pt-2 border-t border-neutral-800">
                   <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Unggah Bukti Transaksi Valid</label>
                   <input 

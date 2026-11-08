@@ -21,19 +21,16 @@ export async function GET() {
 }
 
 // 2. POST: Menyimpan data booking baru secara fleksibel (JSON & FormData)
- export async function POST(request) {
+export async function POST(request) {
   try {
     const client = await clientPromise;
     const db = client.db('barbershop');
     
     const contentType = request.headers.get("content-type") || "";
-    
-    // Variabel penampung data formulir
     let name, service, barber, date, time, paymentMethod, file;
     let paymentProofUrl = null;
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
-      // JALUR 1: Jika frontend mengirim FormData (Unggah Bukti QRIS)
       const formData = await request.formData();
       name = formData.get('name');
       service = formData.get('service');
@@ -43,7 +40,6 @@ export async function GET() {
       paymentMethod = formData.get('paymentMethod');
       file = formData.get('paymentProof');
     } else {
-      // JALUR 2: Jika frontend mengirim JSON biasa (Metode Tunai)
       const json = await request.json();
       name = json.name;
       service = json.service;
@@ -54,25 +50,71 @@ export async function GET() {
       paymentProofUrl = json.paymentProofUrl || null;
     }
 
-    // ==========================================
-    // OTOMATISASI DAN PENJAGAAN KETAT BILA DATA WAKTU KOSONG
-    // ==========================================
-    if (!date) {
-      date = new Date().toISOString().split('T')[0]; // Menghasilkan format otomatis YYYY-MM-DD
-    }
+    // Otomatisasi tanggal & jam jika kosong
+    if (!date) date = new Date().toISOString().split('T')[0];
     if (!time) {
       const sekarang = new Date();
-      const jam = String(sekarang.getHours()).padStart(2, '0');
-      const menit = String(sekarang.getMinutes()).padStart(2, '0');
-      time = `${jam}:${menit}`; // Menghasilkan format otomatis HH:MM
+      time = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
     }
 
-    // Validasi Integritas Data Inti (Nama, Layanan, dan Kapster wajib ada)
     if (!name || !service || !barber) {
       return NextResponse.json({ message: 'Kolom nama, layanan, dan kapster wajib diisi!' }, { status: 400 });
     }
 
-    // Pemrosesan File Gambar Fisik untuk jalur QRIS
+    // ==========================================================
+    // 🔒 BENTENG PROTEKSI MENIT MURNI (ANTI TERBALIK INPUT JAM)
+    // ==========================================================
+    const namaBarberMurni = barber.split(' (')[0].trim();
+
+    const barberDoc = await db.collection('barbers').findOne({ 
+      name: { $regex: new RegExp(`^${namaBarberMurni}$`, 'i') } 
+    });
+    
+    if (barberDoc) {
+      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const namaHariBooking = daysOfWeek[new Date(`${date}T00:00:00`).getDay()];
+
+      const targetBarberId = barberDoc._id.toString();
+      const activeBlockedSlots = await db.collection('blocked-slots').find({
+        $or: [
+          { barberId: targetBarberId },
+          { barberId: barberDoc._id }
+        ],
+        day: namaHariBooking
+      }).toArray();
+
+      // Fungsi konversi waktu string 'HH:MM' ke angka menit murni
+      const convertToMinutes = (timeString) => {
+        if (!timeString) return 0;
+        const cleanTime = timeString.trim().substring(0, 5); 
+        const [hours, minutes] = cleanTime.split(':');
+        return (parseInt(hours, 10) * 60) + parseInt(minutes, 10);
+      };
+
+      const bookingMinutes = convertToMinutes(time);
+
+      const isColliding = activeBlockedSlots.some(slot => {
+        const startMinutes = convertToMinutes(slot.startTime);
+        const endMinutes = convertToMinutes(slot.endTime);
+        
+        // JALUR PENYELAMAT: Jika data di database terbalik (seperti kasus 09:00 ke 08:00)
+        if (startMinutes > endMinutes) {
+          return bookingMinutes >= endMinutes && bookingMinutes <= startMinutes;
+        }
+
+        // Jalur normal urutan matematika jam awal ke jam akhir
+        return bookingMinutes >= startMinutes && bookingMinutes <= endMinutes;
+      });
+
+      if (isColliding) {
+        return NextResponse.json({ 
+          message: `Maaf, kapster ${barberDoc.name} sedang tidak tersedia (Jam Istirahat/Blokir) pada pukul ${time.substring(0, 5)} WIB.` 
+        }, { status: 400 }); 
+      }
+    }
+    // ==========================================================
+
+    // Pemrosesan File Bukti Gambar QRIS
     if (paymentMethod === 'QRIS' && file && typeof file !== 'string') {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -90,11 +132,10 @@ export async function GET() {
       paymentProofUrl = `/uploads/${fileName}`; 
     }
 
-    // Menyusun objek dokumen akhir untuk disave ke MongoDB
     const newAppointment = {
       name,
       service,
-      barber,
+      barber: barberDoc ? barberDoc.name : namaBarberMurni, 
       date,
       time,
       paymentMethod: paymentMethod || 'Tunai',
@@ -116,6 +157,9 @@ export async function GET() {
     return NextResponse.json({ error: "Terjadi kesalahan internal server" }, { status: 500 });
   }
 }
+
+
+
 
 
 // 3. PUT: Mengambil riwayat booking yang HANYA diselesaikan HARI INI

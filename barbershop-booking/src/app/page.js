@@ -6,7 +6,11 @@ export default function CustomerHomepage() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentProofFile, setPaymentProofFile] = useState(null); // Penampung berkas gambar QRIS
+  const [bookingDate, setBookingDate] = useState('');
+  const [bookingTime, setBookingTime] = useState('');
   const [blockedSlots, setBlockedSlots] = useState([]);
+
+  
   // State untuk form pemesanan yang terpilih
   const [selectedBarber, setSelectedBarber] = useState(null);
   const [bookingForm, setBookingForm] = useState({
@@ -44,14 +48,13 @@ export default function CustomerHomepage() {
   useEffect(() => {
     loadData();
   }, []);
-  const handleBookingSubmit = async (e) => {
+    const handleBookingSubmit = async (e) => {
     e.preventDefault();
-    if (!bookingForm.customerName || !bookingForm.service) {
-      alert("Mohon lengkapi nama dan jenis layanan!");
+    if (!bookingForm.customerName || !bookingForm.service || !bookingDate || !bookingTime) {
+      alert("Mohon lengkapi nama, layanan, tanggal, dan jam kunjungan!");
       return;
     }
 
-    // VALIDASI KETAT: Jika pilih QRIS tetapi file gambar masih kosong
     if (bookingForm.paymentMethod === 'QRIS' && !paymentProofFile) {
       alert("Harap unggah gambar bukti pembayaran transaksi QRIS Anda terlebih dahulu!");
       return;
@@ -59,22 +62,18 @@ export default function CustomerHomepage() {
 
     try {
       let response;
-
       if (bookingForm.paymentMethod === 'QRIS') {
-        // JALUR A: Mengirim data sebagai FormData jika memilih QRIS agar berkas terunggah ke server
         const formDataToSend = new FormData();
         formDataToSend.append('name', bookingForm.customerName);
         formDataToSend.append('service', bookingForm.service);
         formDataToSend.append('barber', selectedBarber.name);
+        formDataToSend.append('date', bookingDate); // Mengirim Tanggal Terpilih
+        formDataToSend.append('time', bookingTime); // Mengirim Jam Terpilih
         formDataToSend.append('paymentMethod', 'QRIS');
-        formDataToSend.append('paymentProof', paymentProofFile); // Mengirim file gambar fisik
+        formDataToSend.append('paymentProof', paymentProofFile);
 
-        response = await fetch('/api/appointments', {
-          method: 'POST',
-          body: formDataToSend // Browser otomatis menangani Content-Type multipart/form-data
-        });
+        response = await fetch('/api/appointments', { method: 'POST', body: formDataToSend });
       } else {
-        // JALUR B: Mengirim data sebagai JSON biasa jika memilih Tunai di Kasir
         response = await fetch('/api/appointments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -82,25 +81,28 @@ export default function CustomerHomepage() {
             name: bookingForm.customerName,
             service: bookingForm.service,
             barber: selectedBarber.name,
+            date: bookingDate, // Mengirim Tanggal Terpilih
+            time: bookingTime, // Mengirim Jam Terpilih
             paymentMethod: 'Tunai'
           })
         });
       }
 
       if (response.ok) {
-        alert(`Antrean berhasil dipesan untuk kapster ${selectedBarber.name}! Silakan datang tepat waktu.`);
-        setSelectedBarber(null); // Tutup modal
-        setPaymentProofFile(null); // Reset file gambar
+        alert(`Antrean berhasil dipesan untuk kapster ${selectedBarber.name}!`);
+        setSelectedBarber(null);
+        setBookingDate('');
+        setBookingTime('');
+        setPaymentProofFile(null);
         setBookingForm({ customerName: '', service: '', paymentMethod: 'Tunai' });
       } else {
-        const result = await response.json();
-        alert(result.message || "Gagal melakukan pemesanan. Coba beberapa saat lagi.");
+        alert("Gagal melakukan pemesanan.");
       }
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan sistem saat menghubungi server.");
     }
   };
+
 
   if (loading) {
     return (
@@ -216,6 +218,59 @@ export default function CustomerHomepage() {
                     ))}
                   </select>
                 </div>
+                {/* INPUT TANGGAL BOOKING */}
+                <div>
+                  <label className="block text-xs text-neutral-400 mb-1">Pilih Tanggal Kunjungan</label>
+                  <input 
+                    type="date" required
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 [&::-webkit-calendar-picker-indicator]:invert"
+                    value={bookingDate}
+                    onChange={(e) => { setBookingDate(e.target.value); setBookingTime(''); }}
+                  />
+                </div>
+
+                {/* DROPDOWN JAM DINAMIS YANG OTOMATIS MENYARING JAM SIBUK */}
+                {bookingDate && (
+                  <div>
+                    <label className="block text-xs text-neutral-400 mb-1">Pilih Jam Slot Tersedia</label>
+                    <select
+                      required
+                      className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:outline-none focus:border-amber-500"
+                      value={bookingTime}
+                      onChange={(e) => setBookingTime(e.target.value)}
+                    >
+                      <option value="">-- Pilih Jam Kunjungan --</option>
+                      {(() => {
+                        // 1. Definisikan list jam operasional barbershop Anda
+                        const jamOperasional = [
+                          '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
+                          '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', 
+                          '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', 
+                          '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
+                        ];
+
+                        // 2. Dapatkan nama hari Inggris berdasarkan tanggal pilihan user
+                        const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        const namaHariTerpilih = daysOfWeek[new Date(bookingDate).getDay()];
+
+                        // 3. Filter daftar jam sibuk kapster ini pada hari tersebut
+                        const slotsSibuk = blockedSlots ? blockedSlots.filter(slot => 
+                          slot.barberId === selectedBarber._id && slot.day === namaHariTerpilih
+                        ) : [];
+
+                        // 4. Lakukan penyaringan: jika jam operasional masuk dalam range jam sibuk, maka ELEMINASI!
+                        return jamOperasional
+                          .filter(jam => {
+                            const isTercemarSibuk = slotsSibuk.some(slot => jam >= slot.startTime && jam <= slot.endTime);
+                            return !isTercemarSibuk; // Hanya kembalikan jam yang tidak sibuk
+                          })
+                          .map(jam => (
+                            <option key={jam} value={jam}>{jam} WIB</option>
+                          ));
+                      })()}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs text-neutral-400 mb-1">Metode Pembayaran</label>
