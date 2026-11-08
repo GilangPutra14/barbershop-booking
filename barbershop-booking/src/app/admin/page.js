@@ -491,32 +491,74 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="p-4">Nama Pelanggan</th>
                     <th className="p-4">Layanan</th>
+                    <th className="p-4 text-amber-500 font-bold">Tanggal Booking</th>
+                    <th className="py-3 px-4 text-amber-500 font-bold">Jam Booking</th> 
                     <th className="p-4">Kapster Request</th>
                     <th className="p-4">Pembayaran</th>
                     <th className="p-4 text-center">Aksi</th>
+                    
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800/50">
                   {validAppointments.map((item) => (
-                    <tr key={item._id} className="hover:bg-neutral-950/40">
-                      <td className="p-4 text-neutral-200">{item.name}</td>
-                      <td className="p-4 text-neutral-400">{item.service}</td>
-                      <td className="p-4"><span className="bg-amber-500/10 text-amber-500 text-xs px-2 py-1 rounded border border-amber-500/20">{item.barber}</span></td>
-                      <td className="p-4">
-                        {item.paymentMethod === 'QRIS' ? (
-                          <a href={item.paymentProofUrl} target="_blank" rel="noopener noreferrer" className="bg-cyan-500/10 text-cyan-400 text-xs px-2 py-1 rounded border border-cyan-500/20 font-medium hover:bg-cyan-500/20 transition">
-                            📱 Lihat Bukti QRIS
-                          </a>
-                        ) : (
-                          <span className="bg-neutral-950 text-neutral-400 text-xs px-2 py-1 rounded border border-neutral-800 font-medium">
-                            💵 Tunai / Kasir
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => handleComplete(item._id)} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded transition">✓ Selesai</button>
-                      </td>
-                    </tr>
+<tr key={item._id} className="hover:bg-neutral-950/40 border-b border-neutral-800/40">
+    {/* Kolom 1: Nama Pelanggan */}
+    <td className="p-4 text-neutral-200">{item.name}</td>
+    
+    {/* Kolom 2: Menu Layanan */}
+    <td className="p-4 text-neutral-400">{item.service}</td>
+
+    {/* Kolom 2: tanggal booking */}
+    <td className="p-4 font-mono font-bold text-neutral-300">
+      🗓️ {item.date ? (() => {
+        const [tahun, bulan, tanggal] = item.date.split('-');
+        const namaBulan = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 
+          'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'
+        ];
+        return `${tanggal} ${namaBulan[parseInt(bulan, 10) - 1]} ${tahun}`;
+      })() : '-'}
+    </td>
+    {/* Kolom 3: Jam Kunjungan Slot */}
+    <td className="p-4 font-mono font-bold text-amber-500">
+      ⏰ {item.time ? `${item.time.substring(0, 5)} WIB` : '-'}
+    </td>
+
+    {/* Kolom 4: Kapster Request */}
+    <td className="p-4">
+      <span className="bg-amber-500/10 text-amber-500 text-xs px-2.5 py-1 rounded-md font-medium border border-amber-500/20">
+        {item.barber}
+      </span>
+    </td>
+
+    {/* Kolom 5: Metode Alur Pembayaran */}
+    <td className="p-4">
+      {item.paymentMethod === 'QRIS' ? (
+        <a 
+          href={item.paymentProofUrl} 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="inline-block bg-neutral-950 text-amber-500 text-xs px-3 py-1 rounded border border-neutral-800 hover:border-amber-500/50 transition duration-200 font-semibold"
+        >
+          📱 Lihat Bukti QRIS
+        </a>
+      ) : (
+        <span className="inline-block bg-neutral-950 text-neutral-400 text-xs px-3 py-1 rounded border border-neutral-800 font-medium">
+          💵 Tunai / Kasir
+        </span>
+      )}
+    </td>
+
+    {/* Kolom 6: Tombol Eksekusi Aksi */}
+    <td className="p-4 text-center">
+      <button 
+        onClick={() => handleComplete(item._id)} // Mempertahankan fungsi tombol aksi bawaan Anda
+        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition duration-200"
+      >
+        ✓ Selesai
+      </button>
+    </td>
+  </tr>
                   ))}
                 </tbody>
               </table>
