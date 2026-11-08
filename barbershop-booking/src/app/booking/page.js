@@ -436,6 +436,30 @@ export default function BookingPage() {
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
                 value={formData.barber} onChange={(e) => setFormData({ ...formData, barber: e.target.value })}
               >
+                {/* KOTAK DAFTAR JAM SIBUK REALTIME DI HALAMAN FORM BOOKING */}
+{blockedSlots && blockedSlots.length > 0 && formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)' && (
+  <div className="mt-2 bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl space-y-2">
+    <p className="text-xs font-semibold text-amber-500 uppercase tracking-wider">
+      📅 Jadwal Jam Istirahat / Sibuk Kapster Ini:
+    </p>
+    <div className="grid grid-cols-2 gap-2 max-h-28 overflow-y-auto">
+      {blockedSlots
+        .filter(slot => {
+          const matchedBarber = dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber);
+          return matchedBarber ? slot.barberId === matchedBarber._id : false;
+        })
+        .map((slot, idx) => {
+          const days = { Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu', Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu', Sunday: 'Minggu' };
+          return (
+            <div key={idx} className="bg-neutral-950 border border-neutral-800 p-2 rounded text-xs text-neutral-300 font-mono text-center">
+              {days[slot.day] || slot.day} • <span className="text-amber-500 font-bold">{slot.startTime}-{slot.endTime}</span>
+            </div>
+          );
+        })}
+    </div>
+  </div>
+)}
+
                 <option value="Siapa Saja (Ketersediaan Tercepat)">Siapa Saja (Ketersediaan Tercepat)</option>
                 {dbBarbers && dbBarbers.map((b) => (
                   <option key={b._id} value={`${b.name} (${b.role})`}>

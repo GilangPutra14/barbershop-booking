@@ -6,7 +6,7 @@ export default function CustomerHomepage() {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [paymentProofFile, setPaymentProofFile] = useState(null); // Penampung berkas gambar QRIS
-  
+  const [blockedSlots, setBlockedSlots] = useState([]);
   // State untuk form pemesanan yang terpilih
   const [selectedBarber, setSelectedBarber] = useState(null);
   const [bookingForm, setBookingForm] = useState({
@@ -19,6 +19,7 @@ export default function CustomerHomepage() {
     try {
       const resBarbers = await fetch('/api/barbers');
       const resServices = await fetch('/api/services');
+      const resBlocked = await fetch('/api/blocked-slots'); // BACA DATA JAM SIBUK
       
       if (resBarbers.ok) {
         const barbersData = await resBarbers.json();
@@ -32,6 +33,7 @@ export default function CustomerHomepage() {
         setBarbers(enrichedBarbers);
       }
       if (resServices.ok) setServices(await resServices.json());
+      if (resBlocked.ok) setBlockedSlots(await resBlocked.json()); // SIMPAN KE STATE
     } catch (err) {
       console.error(err);
     } finally {
@@ -163,6 +165,27 @@ export default function CustomerHomepage() {
                 <div>
                   <h3 className="text-md font-bold text-neutral-200">Konfirmasi Pemesanan</h3>
                   <p className="text-xs text-amber-500 font-medium">Kapster Terpilih: {selectedBarber.name}</p>
+                  {/* KOTAK INFORMASI JAM SIBUK KAPSTER YANG DIPILIH */}
+{blockedSlots && blockedSlots.filter(slot => slot.barberId === selectedBarber._id).length > 0 && (
+  <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl space-y-1.5 my-2">
+    <p className="text-[11px] font-bold text-amber-500 uppercase tracking-wide flex items-center gap-1">
+      ⚠️ Jam Tidak Tersedia (Istirahat / Sibuk):
+    </p>
+    <div className="grid grid-cols-2 gap-1.5 max-h-24 overflow-y-auto pt-1">
+      {blockedSlots
+        .filter(slot => slot.barberId === selectedBarber._id)
+        .map((slot, idx) => {
+          const days = { Monday: 'Senin', Tuesday: 'Selasa', Wednesday: 'Rabu', Thursday: 'Kamis', Friday: 'Jumat', Saturday: 'Sabtu', Sunday: 'Minggu' };
+          return (
+            <div key={idx} className="bg-neutral-950/60 border border-neutral-800 p-1.5 rounded text-[10px] text-neutral-300 font-mono text-center">
+              {days[slot.day] || slot.day} : <span className="text-amber-400 font-bold">{slot.startTime} - {slot.endTime}</span>
+            </div>
+          );
+        })}
+    </div>
+  </div>
+)}
+
                 </div>
                 <button onClick={() => { setSelectedBarber(null); setPaymentProofFile(null); }} className="text-neutral-500 hover:text-neutral-300 text-lg font-mono">✕</button>
               </div>
