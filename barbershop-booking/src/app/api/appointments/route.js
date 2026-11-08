@@ -50,7 +50,7 @@ export async function POST(request) {
       paymentProofUrl = json.paymentProofUrl || null;
     }
 
-    // Fungsi penolong konversi string waktu 'HH:MM' ke angka menit murni
+    // Fungsi pembantu konversi waktu string 'HH:MM' ke angka menit murni
     const convertToMinutes = (timeString) => {
       if (!timeString) return 0;
       const cleanTime = timeString.trim().substring(0, 5); 
@@ -58,47 +58,41 @@ export async function POST(request) {
       return (parseInt(hours, 10) * 60) + parseInt(minutes, 10);
     };
 
-    // 1. DAPATKAN WAKTU REALTIME WIB SAAT INI (ZONA WAKTU ASIA/JAKARTA)
+    // Dapatkan waktu realtime WIB saat ini (Asia/Jakarta)
     const sekarangWIB = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-    
-    const tahunSekarang = sekarangWIB.getFullYear();
-    const bulanSekarang = String(sekarangWIB.getMonth() + 1).padStart(2, '0');
-    const tanggalSekarang = String(sekarangWIB.getDate()).padStart(2, '0');
-    const stringTanggalHariIni = `${tahunSekarang}-${bulanSekarang}-${tanggalSekarang}`; // Format: YYYY-MM-DD
+    const stringTanggalHariIni = `${sekarangWIB.getFullYear()}-${String(sekarangWIB.getMonth() + 1).padStart(2, '0')}-${String(sekarangWIB.getDate()).padStart(2, '0')}`;
+    const menitRealtimeSaatIni = convertToMinutes(`${String(sekarangWIB.getHours()).padStart(2, '0')}:${String(sekarangWIB.getMinutes()).padStart(2, '0')}`);
 
-    const jamSekarangRealtime = String(sekarangWIB.getHours()).padStart(2, '0');
-    const menitSekarangRealtime = String(sekarangWIB.getMinutes()).padStart(2, '0');
-    const menitRealtimeSaatIni = convertToMinutes(`${jamSekarangRealtime}:${menitSekarangRealtime}`);
-
-    // Jika input kosong, otomatisasikan ke waktu WIB saat ini
     if (!date) date = stringTanggalHariIni;
-    if (!time) time = `${jamSekarangRealtime}:${menitSekarangRealtime}`;
+    if (!time) time = `${String(sekarangWIB.getHours()).padStart(2, '0')}:${String(sekarangWIB.getMinutes()).padStart(2, '0')}`;
 
     if (!name || !service || !barber) {
       return NextResponse.json({ message: 'Kolom nama, layanan, dan kapster wajib diisi!' }, { status: 400 });
     }
 
     const bookingMinutes = convertToMinutes(time);
+    const targetTimeClean = time.trim().substring(0, 5); // Format bersih 'HH:MM'
+
+    // ====================================================================
+    // 🛡️ PERBAIKAN UTAMA: EKSTRAKSI NAMA KAPSTER YANG AMAN DARI CRASH ARRAY
+    // ====================================================================
+    const namaBarberMurni = barber.includes(' (') 
+      ? barber.split(' (')[0].trim() 
+      : barber.trim();
 
     // ====================================================================
     // 🚨 BENTENG 1: CEKAL JIKA BOOKING HARI INI DI ATAS JAM 21:00 WIB REALTIME
     // ====================================================================
     const BATAS_AKHIR_BOOKING_HARI_INI = convertToMinutes("21:00");
 
-    // Jika pelanggan memilih tanggal hari ini
     if (date === stringTanggalHariIni) {
-      // Cek apakah waktu saat ini di jam dinding riil sudah melewati 21:00 WIB
       if (menitRealtimeSaatIni > BATAS_AKHIR_BOOKING_HARI_INI) {
         return NextResponse.json({ 
-          message: `Slot pemesanan untuk hari ini telah ditutup (Batas akhir pukul 21:00 WIB). Silakan jadwalkan kunjungan ritual Anda di hari berikutnya.` 
+          message: `Slot pemesanan untuk hari ini telah ditutup (Batas akhir pukul 21:00 WIB). Silakan jadwalkan kunjungan Anda di hari berikutnya.` 
         }, { status: 400 });
       }
-
-      // Cek juga jika mereka mencoba memilih jam slot di masa lalu yang sudah terlewat
       if (bookingMinutes < menitRealtimeSaatIni) {
-        return NextResponse.json({
-          message: `Pemesanan ditolak! Anda tidak dapat memesan jam slot yang sudah terlewat untuk hari ini.`
-        }, { status: 400 });
+        return NextResponse.json({ message: `Pemesanan ditolak! Anda tidak dapat memesan jam slot yang sudah terlewat.` }, { status: 400 });
       }
     }
 
@@ -108,54 +102,62 @@ export async function POST(request) {
     const JAM_BUKA_MENIT = convertToMinutes("09:00");
     if (bookingMinutes < JAM_BUKA_MENIT || bookingMinutes > BATAS_AKHIR_BOOKING_HARI_INI) {
       return NextResponse.json({ 
-        message: `Waktu berada di luar jam operasional resmi Boytax Hairstudio. Silakan pilih antara pukul 09:00 hingga 21:00 WIB.` 
+        message: `Waktu berada di luar jam operasional resmi Boytax Hairstudio (09:00 - 21:00 WIB).` 
+      }, { status: 400 });
+    }
+
+    // Ambil dokumen Kapster dari database
+    const barberDoc = await db.collection('barbers').findOne({ 
+      name: { $regex: new RegExp(`^${namaBarberMurni}$`, 'i') } 
+    });
+
+    if (!barberDoc) {
+      return NextResponse.json({ message: 'Data kapster tidak ditemukan di sistem master!' }, { status: 404 });
+    }
+
+    // ====================================================================
+    // ⚔️ BENTENG 3: ANTI-BENTROK SESAMA PELANGGAN (JADWAL KEMBAR)
+    // ====================================================================
+    const existsAppointment = await db.collection('appointments').findOne({
+      barber: barberDoc.name,
+      date: date,
+      time: { $regex: new RegExp(`^${targetTimeClean}`) },
+      status: 'Active'
+    });
+
+    if (existsAppointment) {
+      return NextResponse.json({
+        message: `Slot Waktu Penuh! Kapster ${barberDoc.name} sudah dipesan oleh pelanggan lain pada pukul ${targetTimeClean} WIB.`
       }, { status: 400 });
     }
 
     // ====================================================================
-    // 🔒 BENTENG 3: PROTEKSI JAM SIBUK / ISTIRAHAT KASIR (BLOCKED SLOTS)
+    // 🔒 BENTENG 4: PROTEKSI JAM SIBUK / ISTIRAHAT ADMIN (BLOCKED SLOTS)
     // ====================================================================
-    const namaBarberMurni = barber.split(' (')[0].trim();
+    const [tahun, bulan, tanggal] = date.split('-').map(num => parseInt(num, 10));
+    const objekTanggalLokal = new Date(tahun, bulan - 1, tanggal);
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const namaHariBooking = daysOfWeek[objekTanggalLokal.getDay()];
 
-    const barberDoc = await db.collection('barbers').findOne({ 
-      name: { $regex: new RegExp(`^${namaBarberMurni}$`, 'i') } 
+    const activeBlockedSlots = await db.collection('blocked-slots').find({
+      $or: [{ barberId: barberDoc._id.toString() }, { barberId: barberDoc._id }],
+      day: namaHariBooking
+    }).toArray();
+
+    const isColliding = activeBlockedSlots.some(slot => {
+      const start = convertToMinutes(slot.startTime);
+      const end = convertToMinutes(slot.endTime);
+      return start > end ? (bookingMinutes >= end && bookingMinutes <= start) : (bookingMinutes >= start && bookingMinutes <= end);
     });
-    
-    if (barberDoc) {
-      const [tahun, bulan, tanggal] = date.split('-').map(num => parseInt(num, 10));
-      const objekTanggalLokal = new Date(tahun, bulan - 1, tanggal);
-      
-      const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const namaHariBooking = daysOfWeek[objekTanggalLokal.getDay()];
 
-      const targetBarberId = barberDoc._id.toString();
-      const activeBlockedSlots = await db.collection('blocked-slots').find({
-        $or: [
-          { barberId: targetBarberId },
-          { barberId: barberDoc._id }
-        ],
-        day: namaHariBooking
-      }).toArray();
-
-      const isColliding = activeBlockedSlots.some(slot => {
-        const start = convertToMinutes(slot.startTime);
-        const end = convertToMinutes(slot.endTime);
-        
-        if (start > end) {
-          return bookingMinutes >= end && bookingMinutes <= start;
-        }
-        return bookingMinutes >= start && bookingMinutes <= end;
-      });
-
-      if (isColliding) {
-        return NextResponse.json({ 
-          message: `Maaf, kapster ${barberDoc.name} sedang istirahat atau tidak tersedia pada pukul ${time.substring(0, 5)} WIB.` 
-        }, { status: 400 }); 
-      }
+    if (isColliding) {
+      return NextResponse.json({ 
+        message: `Maaf, kapster ${barberDoc.name} sedang tidak tersedia (Jam Istirahat) pada pukul ${targetTimeClean} WIB.` 
+      }, { status: 400 }); 
     }
     // ====================================================================
 
-    // Pemrosesan Berkas Gambar Fisik QRIS
+    // Pemrosesan File Gambar Fisik QRIS
     if (paymentMethod === 'QRIS' && file && typeof file !== 'string') {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -176,9 +178,9 @@ export async function POST(request) {
     const newAppointment = {
       name,
       service,
-      barber: barberDoc ? barberDoc.name : namaBarberMurni, 
+      barber: barberDoc.name, 
       date,
-      time,
+      time: targetTimeClean,
       paymentMethod: paymentMethod || 'Tunai',
       paymentProofUrl, 
       status: 'Active',
@@ -198,6 +200,8 @@ export async function POST(request) {
     return NextResponse.json({ error: "Terjadi kesalahan internal server" }, { status: 500 });
   }
 }
+
+
 
 
 

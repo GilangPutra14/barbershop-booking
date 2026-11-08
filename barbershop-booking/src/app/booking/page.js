@@ -252,6 +252,7 @@ export default function BookingPage() {
   const [dbBarbers, setDbBarbers] = useState();
   const [dbServices, setDbServices] = useState();
   const [blockedSlots, setBlockedSlots] = useState();
+  const [activeAppointments, setActiveAppointments] = useState([]); // State baru untuk cek bentrok sesama pelanggan
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -275,6 +276,10 @@ export default function BookingPage() {
 
         const resBlocked = await fetch('/api/blocked-slots');
         if (resBlocked.ok) setBlockedSlots(await resBlocked.json());
+
+        // Ambil data janji temu aktif untuk mendeteksi jam yang sudah di-booking pelanggan lain
+        const resApps = await fetch('/api/appointments');
+        if (resApps.ok) setActiveAppointments(await resApps.json());
       } catch (error) {
         console.error("Gagal memuat manifes data awal:", error);
       }
@@ -332,6 +337,9 @@ export default function BookingPage() {
 
       if (response.ok) {
         setIsSubmitted(true);
+        // Refresh data antrean setelah berhasil booking
+        const resApps = await fetch('/api/appointments');
+        if (resApps.ok) setActiveAppointments(await resApps.json());
       } else {
         setErrorMessage(result.message || 'Gagal mengamankan jadwal kursi pangkas.');
       }
@@ -419,11 +427,14 @@ export default function BookingPage() {
             <div>
               <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Tanggal Kunjungan</label>
               <input 
-                type="date" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                type="date" required 
+                min={new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})).toISOString().split('T')[0]}
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert cursor-pointer"
                 value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value, time: ''})}
               />
             </div>
 
+            {/* TIME SLOT BADGE GRID TERINTEGRASI PENCEKALAN SLOT TERISI */}
             <div>
               <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Pilih Golden Slot Waktu Tersedia</label>
               {!formData.date ? (
@@ -439,15 +450,19 @@ export default function BookingPage() {
                       '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', 
                       '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
                     ];
+
                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                     const hariIni = days[new Date(`${formData.date}T00:00:00`).getDay()];
 
+                    const namaBarberMurni = formData.barber.split(' (')[0].trim();
                     let selectedBarberId = null;
                     if (formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)') {
-                      const matchedBarber = dbBarbers ? dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber) : null;
+                      const matchedBarber = dbBarbers ? dbBarbers.find(b => b.name === namaBarberMurni) : null;
                       if (matchedBarber) selectedBarberId = matchedBarber._id;
                     }
-                    const slotsSibuk = (blockedSlots && selectedBarberId) ? blockedSlots.filter(slot => 
+
+                    // 1. Filter jam istirahat dari admin
+                    const slotsIstirahat = (blockedSlots && selectedBarberId) ? blockedSlots.filter(slot => 
                       slot.barberId === selectedBarberId && slot.day === hariIni
                     ) : [];
 
@@ -459,19 +474,31 @@ export default function BookingPage() {
 
                     return listJam.map((jam) => {
                       const currentMinutes = convertToMinutes(jam);
-                      const isBlocked = slotsSibuk.some(slot => {
+                      
+                      // Cek status Blokir Admin
+                      const isBlockedByAdmin = slotsIstirahat.some(slot => {
                         const start = convertToMinutes(slot.startTime);
                         const end = convertToMinutes(slot.endTime);
                         return start > end ? (currentMinutes >= end && currentMinutes <= start) : (currentMinutes >= start && currentMinutes <= end);
                       });
+
+                      // 2. Cek status apakah sudah di-booking oleh pelanggan lain (TERISI)
+                      const isAlreadyBooked = activeAppointments.some(app => 
+                        app.barber === namaBarberMurni &&
+                        app.date === formData.date &&
+                        app.time.substring(0, 5) === jam &&
+                        app.status === 'Active'
+                      );
+
+                      const isDisable = isBlockedByAdmin || isAlreadyBooked;
                       const isSelected = formData.time === jam;
 
                       return (
                         <button
-                          key={jam} type="button" disabled={isBlocked}
+                          key={jam} type="button" disabled={isDisable}
                           onClick={() => setFormData({ ...formData, time: jam })}
                           className={`py-2.5 rounded-xl font-mono text-xs font-bold border transition duration-200 flex flex-col items-center justify-center ${
-                            isBlocked 
+                            isDisable 
                               ? 'bg-neutral-900 border-neutral-950 text-neutral-600 line-through cursor-not-allowed' 
                               : isSelected
                                 ? 'bg-amber-500 border-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
@@ -479,7 +506,9 @@ export default function BookingPage() {
                           }`}
                         >
                           <span>{jam}</span>
-                          <span className="text-[7px] font-sans opacity-70 mt-0.5 tracking-wider">{isBlocked ? 'PENUH' : 'TERSEDIA'}</span>
+                          <span className="text-[7px] font-sans opacity-70 mt-0.5 tracking-wider">
+                            {isBlockedByAdmin ? 'ISTIRAHAT' : isAlreadyBooked ? 'TERISI' : 'TERSEDIA'}
+                          </span>
                         </button>
                       );
                     });
