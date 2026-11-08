@@ -219,15 +219,25 @@ export default function CustomerHomepage() {
                   </select>
                 </div>
                 {/* INPUT TANGGAL BOOKING */}
+                                {/* INPUT TANGGAL DENGAN PEMBATASAN MIN & MAX BINDING PADA POPUP MODAL */}
                 <div>
                   <label className="block text-xs text-neutral-400 mb-1">Pilih Tanggal Kunjungan</label>
                   <input 
-                    type="date" required
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 [&::-webkit-calendar-picker-indicator]:invert"
+                    type="date" 
+                    required
+                    // 🔒 Mengunci kalender lokal waktu Indonesia Barat (WIB)
+                    min={new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})).toISOString().split('T')[0]}
+                    max={(() => {
+                      const maxDate = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"}));
+                      maxDate.setDate(maxDate.getDate() + 7);
+                      return maxDate.toISOString().split('T')[0];
+                    })()}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:outline-none focus:border-amber-500 [&::-webkit-calendar-picker-indicator]:invert cursor-pointer"
                     value={bookingDate}
                     onChange={(e) => { setBookingDate(e.target.value); setBookingTime(''); }}
                   />
                 </div>
+
 
                 {/* DROPDOWN JAM DINAMIS YANG OTOMATIS MENYARING JAM SIBUK */}
                 {bookingDate && (

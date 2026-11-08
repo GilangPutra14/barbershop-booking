@@ -249,14 +249,13 @@ export default function BookingPage() {
 
   const [paymentProof, setPaymentProof] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [dbBarbers, setDbBarbers] = useState([]);
-  const [dbServices, setDbServices] = useState([]);
-  const [blockedSlots, setBlockedSlots] = useState([]);
+  const [dbBarbers, setDbBarbers] = useState();
+  const [dbServices, setDbServices] = useState();
+  const [blockedSlots, setBlockedSlots] = useState();
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-
-    useEffect(() => {
+  useEffect(() => {
     async function getData() {
       try {
         const resBarbers = await fetch('/api/barbers');
@@ -277,7 +276,7 @@ export default function BookingPage() {
         const resBlocked = await fetch('/api/blocked-slots');
         if (resBlocked.ok) setBlockedSlots(await resBlocked.json());
       } catch (error) {
-        console.error("Gagal memuat data awal:", error);
+        console.error("Gagal memuat manifes data awal:", error);
       }
     }
     getData();
@@ -288,21 +287,26 @@ export default function BookingPage() {
     if (file) {
       const validExtensions = ['image/jpeg', 'image/png', 'image/jpg'];
       if (!validExtensions.includes(file.type)) {
-        alert('Format berkas tidak valid! Harap unggah gambar bukti pembayaran (JPG/PNG).');
+        alert('Format berkas tidak valid! Harap unggah nota bukti transaksi valid (JPG/PNG).');
         e.target.value = null;
         return;
       }
       setPaymentProof(file);
     }
   };
-
-    const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMessage('');
 
+    if (!formData.time) {
+      setErrorMessage('Silakan pilih salah satu golden slot waktu yang tersedia terlebih dahulu.');
+      setIsLoading(false);
+      return;
+    }
+
     if (formData.paymentMethod === 'QRIS' && !paymentProof) {
-      setErrorMessage('Harap unggah bukti pembayaran valid Anda terlebih dahulu untuk metode QRIS.');
+      setErrorMessage('Harap lampirkan dokumen transaksi QRIS Anda untuk validasi prioritas.');
       setIsLoading(false);
       return;
     }
@@ -329,68 +333,68 @@ export default function BookingPage() {
       if (response.ok) {
         setIsSubmitted(true);
       } else {
-        setErrorMessage(result.message || 'Gagal mengirim data booking.');
+        setErrorMessage(result.message || 'Gagal mengamankan jadwal kursi pangkas.');
       }
     } catch (error) {
-      setErrorMessage('Koneksi internet bermasalah atau server mati.');
+      setErrorMessage('Koneksi terputus. Gagal menghubungi server Boytax Hairstudio.');
     } finally {
       setIsLoading(false);
     }
   };
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 px-6 py-12 font-sans flex items-center justify-center">
-      <div className="w-full max-w-xl bg-neutral-900 border border-neutral-800 p-8 rounded-2xl shadow-xl">
+      <div className="w-full max-w-xl bg-neutral-900/60 backdrop-blur-md border border-neutral-800 p-8 rounded-2xl shadow-xl">
         
         <div className="mb-8">
-          <a href="/" className="text-amber-500 hover:text-amber-400 text-sm font-medium transition duration-200">
+          <a href="/" className="text-amber-500 hover:text-amber-400 text-xs font-semibold tracking-widest uppercase transition duration-200">
             ← Kembali ke Beranda
           </a>
-          <h1 className="text-3xl font-serif font-bold text-amber-500 mt-4">Formulir Booking Slot</h1>
-          <p className="text-neutral-400 text-sm mt-1">Silakan isi detail kunjungan Anda di bawah ini.</p>
+          <h1 className="text-3xl font-serif font-bold text-amber-500 mt-4 tracking-wide">Amankan Kursi Anda</h1>
+          <p className="text-neutral-400 text-xs mt-1">Rancang janji temu janji ritual perawatan rambut eksklusif Anda.</p>
         </div>
 
         {isSubmitted ? (
           <div className="bg-amber-500/10 border border-amber-500/30 p-6 rounded-xl text-center">
-            <h3 className="text-xl font-bold text-amber-500 mb-2">🎉 Booking Berhasil!</h3>
-            <p className="text-neutral-300 text-sm mb-4">Jadwal Anda telah tercatat di sistem kami.</p>
-            <div className="text-left bg-neutral-950 p-4 rounded-lg text-xs space-y-2 text-neutral-400 font-mono">
-              <p><span className="text-amber-500">Nama:</span> {formData.name}</p>
-              <p><span className="text-amber-500">Layanan:</span> {formData.service}</p>
-              <p><span className="text-amber-500">Kapster:</span> {formData.barber}</p>
-              <p><span className="text-amber-500">Jadwal:</span> {formData.date} Pukul {formData.time} WIB</p>
-              <p><span className="text-amber-500">Metode Pembayaran:</span> {formData.paymentMethod}</p>
+            <h3 className="text-xl font-bold text-amber-500 mb-2">🎉 Slot Berhasil Diamankan!</h3>
+            <p className="text-neutral-300 text-sm mb-4">Jadwal Anda telah masuk dalam manifes prioritas kami.</p>
+            <div className="text-left bg-neutral-950 p-4 rounded-lg text-xs space-y-2 text-neutral-400 font-mono border border-neutral-800/60">
+              <p><span className="text-amber-500 font-sans font-semibold">GENTLEMAN:</span> {formData.name}</p>
+              <p><span className="text-amber-500 font-sans font-semibold">RITUAL:</span> {formData.service}</p>
+              <p><span className="text-amber-500 font-sans font-semibold">HAIR ARTIST:</span> {formData.barber}</p>
+              <p><span className="text-amber-500 font-sans font-semibold">WAKTU KUNJUNGAN:</span> {formData.date} pukul {formData.time} WIB</p>
+              <p><span className="text-amber-500 font-sans font-semibold">METODE TRANSAKSI:</span> {formData.paymentMethod === 'Tunai' ? 'Tunai di Kasir' : 'QRIS Prioritas'}</p>
             </div>
             <button 
-              onClick={() => { setIsSubmitted(false); setPaymentProof(null); }}
-              className="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-3 rounded-lg text-sm transition duration-200"
+              onClick={() => { setIsSubmitted(false); setPaymentProof(null); setFormData({...formData, time: ''}); }}
+              className="mt-6 w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-3 rounded-lg text-xs tracking-widest uppercase transition duration-200"
             >
-              Buat Janji Baru
+              Rancang Jadwal Baru
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
             {errorMessage && (
-              <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-sm font-medium">
+              <div className="bg-red-500/10 border border-red-500/30 text-red-500 p-4 rounded-xl text-xs font-semibold">
                 ⚠️ {errorMessage}
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Nama Lengkap</label>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Nama Pria Terhormat (Gentleman's Name)</label>
               <input 
-                type="text" required placeholder="Masukkan nama Anda"
-                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
+                type="text" required placeholder="Masukkan nama lengkap Anda..."
+                className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 placeholder-neutral-700"
                 value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Layanan</label>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Pilih Ritual Perawatan Anda</label>
               <select 
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
                 value={formData.service} onChange={(e) => setFormData({...formData, service: e.target.value})}
               >
-                {dbServices.length === 0 ? <option>Memuat layanan...</option> : dbServices.map((s) => (
+                {dbServices && dbServices.length === 0 ? <option>Memuat ritual menu...</option> : dbServices && dbServices.map((s) => (
                   <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>
                     {s.name} - Rp {s.price.toLocaleString('id-ID')} ({s.duration})
                   </option>
@@ -399,7 +403,7 @@ export default function BookingPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Pilih Kapster</label>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Pilih Hair Artist Andalan</label>
               <select
                 className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
                 value={formData.barber} onChange={(e) => setFormData({ ...formData, barber: e.target.value, time: '' })}
@@ -412,64 +416,88 @@ export default function BookingPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Tanggal Kunjungan</label>
+              <input 
+                type="date" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
+                value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value, time: ''})}
+              />
+            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Tanggal</label>
-                <input 
-                  type="date" required className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200 [&::-webkit-calendar-picker-indicator]:invert"
-                  value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value, time: ''})}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Jam Slot Tersedia</label>
-                <select 
-                  required
-                  className="w-full bg-neutral-950 border border-neutral-800 focus:border-amber-500 rounded-lg p-3 text-sm text-neutral-100 focus:outline-none transition duration-200"
-                  value={formData.time}
-                  onChange={(e) => setFormData({...formData, time: e.target.value})}
-                  disabled={!formData.date}
-                >
-                  <option value="">-- Pilih Jam --</option>
-                  {formData.date && (() => {
+            <div>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Pilih Golden Slot Waktu Tersedia</label>
+              {!formData.date ? (
+                <div className="bg-neutral-950/40 border border-neutral-800/80 p-4 rounded-xl text-center text-xs text-neutral-500 italic">
+                  Tentukan tanggal di atas untuk memunculkan slot waktu luang.
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 pt-1">
+                  {(() => {
                     const listJam = [
                       '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
                       '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', 
                       '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', 
                       '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'
                     ];
-
                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const hariIni = days[new Date(formData.date).getDay()];
+                    const hariIni = days[new Date(`${formData.date}T00:00:00`).getDay()];
 
                     let selectedBarberId = null;
                     if (formData.barber !== 'Siapa Saja (Ketersediaan Tercepat)') {
                       const matchedBarber = dbBarbers ? dbBarbers.find(b => `${b.name} (${b.role})` === formData.barber) : null;
                       if (matchedBarber) selectedBarberId = matchedBarber._id;
                     }
-
                     const slotsSibuk = (blockedSlots && selectedBarberId) ? blockedSlots.filter(slot => 
                       slot.barberId === selectedBarberId && slot.day === hariIni
                     ) : [];
 
-                    return listJam
-                      .filter(jam => !slotsSibuk.some(slot => jam >= slot.startTime && jam <= slot.endTime))
-                      .map(jam => <option key={jam} value={jam}>{jam} WIB</option>);
+                    const convertToMinutes = (tStr) => {
+                      if (!tStr) return 0;
+                      const [h, m] = tStr.trim().substring(0, 5).split(':');
+                      return (parseInt(h, 10) * 60) + parseInt(m, 10);
+                    };
+
+                    return listJam.map((jam) => {
+                      const currentMinutes = convertToMinutes(jam);
+                      const isBlocked = slotsSibuk.some(slot => {
+                        const start = convertToMinutes(slot.startTime);
+                        const end = convertToMinutes(slot.endTime);
+                        return start > end ? (currentMinutes >= end && currentMinutes <= start) : (currentMinutes >= start && currentMinutes <= end);
+                      });
+                      const isSelected = formData.time === jam;
+
+                      return (
+                        <button
+                          key={jam} type="button" disabled={isBlocked}
+                          onClick={() => setFormData({ ...formData, time: jam })}
+                          className={`py-2.5 rounded-xl font-mono text-xs font-bold border transition duration-200 flex flex-col items-center justify-center ${
+                            isBlocked 
+                              ? 'bg-neutral-900 border-neutral-950 text-neutral-600 line-through cursor-not-allowed' 
+                              : isSelected
+                                ? 'bg-amber-500 border-amber-500 text-neutral-950 shadow-md shadow-amber-500/10'
+                                : 'bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-amber-500/40 hover:text-amber-500'
+                          }`}
+                        >
+                          <span>{jam}</span>
+                          <span className="text-[7px] font-sans opacity-70 mt-0.5 tracking-wider">{isBlocked ? 'PENUH' : 'TERSEDIA'}</span>
+                        </button>
+                      );
+                    });
                   })()}
-                </select>
-              </div>
+                </div>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Metode Pembayaran</label>
+              <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Pilih Alur Metode Transaksi</label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition ${formData.paymentMethod === 'Tunai' ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-400'}`}>
                   <input type="radio" name="paymentMethod" value="Tunai" checked={formData.paymentMethod === 'Tunai'} onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})} className="hidden" />
-                  <span className="text-sm font-medium">💵 Tunai / Cash</span>
+                  <span className="text-sm font-medium">💵 TUNAI DI KASIR</span>
                 </label>
                 <label className={`flex items-center justify-center p-3 rounded-lg border cursor-pointer transition ${formData.paymentMethod === 'QRIS' ? 'bg-amber-500/10 border-amber-500 text-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-400'}`}>
                   <input type="radio" name="paymentMethod" value="QRIS" checked={formData.paymentMethod === 'QRIS'} onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})} className="hidden" />
-                  <span className="text-sm font-medium">📱 QRIS / Digital</span>
+                  <span className="text-sm font-medium">📱 QRIS PRIORITAS</span>
                 </label>
               </div>
             </div>
@@ -478,14 +506,14 @@ export default function BookingPage() {
               <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-4">
                 <div className="flex flex-col items-center p-2 bg-white rounded-lg max-w-[200px] mx-auto">
                   <img src="https://qrserver.com" alt="QRIS Code" className="w-full h-auto aspect-square object-contain" />
-                  <span className="text-[10px] text-neutral-800 font-bold tracking-wider mt-1">NMID : BOYTAX_BARBER</span>
+                  <span className="text-[10px] text-neutral-800 font-bold tracking-wider mt-1">NMID : BARBER_PREMIUM</span>
                 </div>
-                <p className="text-center text-xs text-neutral-400 px-4">Silakan pindai QRIS di atas untuk melakukan transfer pembayaran sesuai harga layanan.</p>
+                <p className="text-center text-xs text-neutral-400 px-4">Pindai kode QRIS resmi di atas dan selesaikan nominal transaksi sesuai tarif menu ritual Anda.</p>
                 <div className="pt-2 border-t border-neutral-800">
-                  <label className="block text-xs font-semibold tracking-wider text-amber-500 uppercase mb-2">Unggah Bukti Transaksi Valid</label>
+                  <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-2">Lampirkan Nota Bukti Transaksi Valid</label>
                   <input 
                     type="file" required={formData.paymentMethod === 'QRIS'} accept="image/*" onChange={handleFileChange}
-                    className="w-full text-xs text-neutral-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-neutral-950 hover:file:bg-amber-600 cursor-pointer"
+                    className="w-full text-xs text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-neutral-950 hover:file:bg-amber-600 cursor-pointer uppercase tracking-wider"
                   />
                 </div>
               </div>
@@ -493,12 +521,17 @@ export default function BookingPage() {
 
             <button 
               type="submit" disabled={isLoading}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-wide shadow-lg transition duration-300 mt-4 disabled:bg-amber-700"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold py-4 rounded-lg tracking-widest shadow-lg transition duration-300 mt-4 disabled:bg-amber-700 text-xs uppercase"
             >
-              {isLoading ? 'MEMPROSES...' : 'KONFIRMASI JADWAL'}
+              {isLoading ? 'SEDANG MEMPROSES...' : 'KUNCI JADWAL POTONG SEKARANG ✂️'}
             </button>
           </form>
         )}
+        
+        <div className="mt-8 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-500">
+          ⚡ <span className="font-semibold text-amber-500/80">Garansi Bebas Antre Panjang:</span> Datang tepat waktu, langsung duduk di kursi eksklusif tanpa membuang waktu berharga Anda.
+        </div>
+
       </div>
     </div>
   );

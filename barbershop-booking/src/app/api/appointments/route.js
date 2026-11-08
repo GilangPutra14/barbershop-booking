@@ -50,20 +50,71 @@ export async function POST(request) {
       paymentProofUrl = json.paymentProofUrl || null;
     }
 
-    // Otomatisasi tanggal & jam jika kosong
-    if (!date) date = new Date().toISOString().split('T')[0];
-    if (!time) {
-      const sekarang = new Date();
-      time = `${String(sekarang.getHours()).padStart(2, '0')}:${String(sekarang.getMinutes()).padStart(2, '0')}`;
-    }
+    // Fungsi penolong konversi string waktu 'HH:MM' ke angka menit murni
+    const convertToMinutes = (timeString) => {
+      if (!timeString) return 0;
+      const cleanTime = timeString.trim().substring(0, 5); 
+      const [hours, minutes] = cleanTime.split(':');
+      return (parseInt(hours, 10) * 60) + parseInt(minutes, 10);
+    };
+
+    // 1. DAPATKAN WAKTU REALTIME WIB SAAT INI (ZONA WAKTU ASIA/JAKARTA)
+    const sekarangWIB = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+    
+    const tahunSekarang = sekarangWIB.getFullYear();
+    const bulanSekarang = String(sekarangWIB.getMonth() + 1).padStart(2, '0');
+    const tanggalSekarang = String(sekarangWIB.getDate()).padStart(2, '0');
+    const stringTanggalHariIni = `${tahunSekarang}-${bulanSekarang}-${tanggalSekarang}`; // Format: YYYY-MM-DD
+
+    const jamSekarangRealtime = String(sekarangWIB.getHours()).padStart(2, '0');
+    const menitSekarangRealtime = String(sekarangWIB.getMinutes()).padStart(2, '0');
+    const menitRealtimeSaatIni = convertToMinutes(`${jamSekarangRealtime}:${menitSekarangRealtime}`);
+
+    // Jika input kosong, otomatisasikan ke waktu WIB saat ini
+    if (!date) date = stringTanggalHariIni;
+    if (!time) time = `${jamSekarangRealtime}:${menitSekarangRealtime}`;
 
     if (!name || !service || !barber) {
       return NextResponse.json({ message: 'Kolom nama, layanan, dan kapster wajib diisi!' }, { status: 400 });
     }
 
-    // ==========================================================
-    // 🔒 BENTENG PROTEKSI MENIT MURNI (ANTI TERBALIK INPUT JAM)
-    // ==========================================================
+    const bookingMinutes = convertToMinutes(time);
+
+    // ====================================================================
+    // 🚨 BENTENG 1: CEKAL JIKA BOOKING HARI INI DI ATAS JAM 21:00 WIB REALTIME
+    // ====================================================================
+    const BATAS_AKHIR_BOOKING_HARI_INI = convertToMinutes("21:00");
+
+    // Jika pelanggan memilih tanggal hari ini
+    if (date === stringTanggalHariIni) {
+      // Cek apakah waktu saat ini di jam dinding riil sudah melewati 21:00 WIB
+      if (menitRealtimeSaatIni > BATAS_AKHIR_BOOKING_HARI_INI) {
+        return NextResponse.json({ 
+          message: `Slot pemesanan untuk hari ini telah ditutup (Batas akhir pukul 21:00 WIB). Silakan jadwalkan kunjungan ritual Anda di hari berikutnya.` 
+        }, { status: 400 });
+      }
+
+      // Cek juga jika mereka mencoba memilih jam slot di masa lalu yang sudah terlewat
+      if (bookingMinutes < menitRealtimeSaatIni) {
+        return NextResponse.json({
+          message: `Pemesanan ditolak! Anda tidak dapat memesan jam slot yang sudah terlewat untuk hari ini.`
+        }, { status: 400 });
+      }
+    }
+
+    // ====================================================================
+    // 🛡️ BENTENG 2: BATAS JAM OPERASIONAL TOKO SECARA UMUM (09:00 - 21:00 WIB)
+    // ====================================================================
+    const JAM_BUKA_MENIT = convertToMinutes("09:00");
+    if (bookingMinutes < JAM_BUKA_MENIT || bookingMinutes > BATAS_AKHIR_BOOKING_HARI_INI) {
+      return NextResponse.json({ 
+        message: `Waktu berada di luar jam operasional resmi Boytax Hairstudio. Silakan pilih antara pukul 09:00 hingga 21:00 WIB.` 
+      }, { status: 400 });
+    }
+
+    // ====================================================================
+    // 🔒 BENTENG 3: PROTEKSI JAM SIBUK / ISTIRAHAT KASIR (BLOCKED SLOTS)
+    // ====================================================================
     const namaBarberMurni = barber.split(' (')[0].trim();
 
     const barberDoc = await db.collection('barbers').findOne({ 
@@ -71,8 +122,11 @@ export async function POST(request) {
     });
     
     if (barberDoc) {
+      const [tahun, bulan, tanggal] = date.split('-').map(num => parseInt(num, 10));
+      const objekTanggalLokal = new Date(tahun, bulan - 1, tanggal);
+      
       const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const namaHariBooking = daysOfWeek[new Date(`${date}T00:00:00`).getDay()];
+      const namaHariBooking = daysOfWeek[objekTanggalLokal.getDay()];
 
       const targetBarberId = barberDoc._id.toString();
       const activeBlockedSlots = await db.collection('blocked-slots').find({
@@ -83,38 +137,25 @@ export async function POST(request) {
         day: namaHariBooking
       }).toArray();
 
-      // Fungsi konversi waktu string 'HH:MM' ke angka menit murni
-      const convertToMinutes = (timeString) => {
-        if (!timeString) return 0;
-        const cleanTime = timeString.trim().substring(0, 5); 
-        const [hours, minutes] = cleanTime.split(':');
-        return (parseInt(hours, 10) * 60) + parseInt(minutes, 10);
-      };
-
-      const bookingMinutes = convertToMinutes(time);
-
       const isColliding = activeBlockedSlots.some(slot => {
-        const startMinutes = convertToMinutes(slot.startTime);
-        const endMinutes = convertToMinutes(slot.endTime);
+        const start = convertToMinutes(slot.startTime);
+        const end = convertToMinutes(slot.endTime);
         
-        // JALUR PENYELAMAT: Jika data di database terbalik (seperti kasus 09:00 ke 08:00)
-        if (startMinutes > endMinutes) {
-          return bookingMinutes >= endMinutes && bookingMinutes <= startMinutes;
+        if (start > end) {
+          return bookingMinutes >= end && bookingMinutes <= start;
         }
-
-        // Jalur normal urutan matematika jam awal ke jam akhir
-        return bookingMinutes >= startMinutes && bookingMinutes <= endMinutes;
+        return bookingMinutes >= start && bookingMinutes <= end;
       });
 
       if (isColliding) {
         return NextResponse.json({ 
-          message: `Maaf, kapster ${barberDoc.name} sedang tidak tersedia (Jam Istirahat/Blokir) pada pukul ${time.substring(0, 5)} WIB.` 
+          message: `Maaf, kapster ${barberDoc.name} sedang istirahat atau tidak tersedia pada pukul ${time.substring(0, 5)} WIB.` 
         }, { status: 400 }); 
       }
     }
-    // ==========================================================
+    // ====================================================================
 
-    // Pemrosesan File Bukti Gambar QRIS
+    // Pemrosesan Berkas Gambar Fisik QRIS
     if (paymentMethod === 'QRIS' && file && typeof file !== 'string') {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -148,7 +189,7 @@ export async function POST(request) {
 
     return NextResponse.json({ 
       success: true, 
-      message: 'Booking berhasil dibuat!', 
+      message: 'Booking kursi berhasil diamankan!', 
       insertedId: result.insertedId 
     }, { status: 201 });
 
