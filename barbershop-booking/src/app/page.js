@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { FaInstagram, FaTiktok } from 'react-icons/fa6';
 
 export default function CustomerHomepage() {
   const [barbers, setBarbers] = useState([]);
@@ -48,7 +49,7 @@ export default function CustomerHomepage() {
   useEffect(() => {
     loadData();
   }, []);
-  const handleBookingSubmit = async (e) => {
+    const handleBookingSubmit = async (e) => {
     e.preventDefault();
     if (!bookingForm.customerName || !bookingForm.service || !bookingDate || !bookingTime) {
       alert("Mohon lengkapi nama, layanan, tanggal, dan jam kunjungan!");
@@ -62,11 +63,19 @@ export default function CustomerHomepage() {
 
     try {
       let response;
+      
+      // Ambil string ID kapster secara aman (mendukung format teks biasa maupun $oid MongoDB)
+      const stringIdBarber = selectedBarber._id?.$oid || selectedBarber._id?.toString() || '';
+
       if (bookingForm.paymentMethod === 'QRIS') {
         const formDataToSend = new FormData();
         formDataToSend.append('name', bookingForm.customerName);
         formDataToSend.append('service', bookingForm.service);
-        formDataToSend.append('barber', selectedBarber.name);
+        
+        // 🔒 AMAN: Bersihkan nama dari spasi ujung & kirim ID kapster sekalian
+        formDataToSend.append('barber', selectedBarber.name.trim());
+        formDataToSend.append('barberId', stringIdBarber);
+        
         formDataToSend.append('date', bookingDate); 
         formDataToSend.append('time', bookingTime); 
         formDataToSend.append('paymentMethod', 'QRIS');
@@ -80,7 +89,11 @@ export default function CustomerHomepage() {
           body: JSON.stringify({
             name: bookingForm.customerName,
             service: bookingForm.service,
-            barber: selectedBarber.name,
+            
+            // 🔒 AMAN: Bersihkan nama dari spasi ujung & kirim ID kapster sekalian
+            barber: selectedBarber.name.trim(),
+            barberId: stringIdBarber,
+            
             date: bookingDate, 
             time: bookingTime, 
             paymentMethod: 'Tunai'
@@ -106,6 +119,7 @@ export default function CustomerHomepage() {
       alert("⚠️ Terjadi gangguan koneksi ke server.");
     }
   };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-400 flex items-center justify-center font-sans">
@@ -134,7 +148,7 @@ export default function CustomerHomepage() {
           </div>
           
           <h1 className="text-5xl md:text-6xl font-black font-serif tracking-wider text-transparent bg-clip-text bg-gradient-to-b from-neutral-50 via-neutral-200 to-neutral-400">
-            BOYTAX HAIRSTUDIO
+            BOYTAX BARBER.CO
           </h1>
           
           <p className="text-amber-500/90 font-serif italic text-sm md:text-base tracking-wide">
@@ -191,14 +205,35 @@ export default function CustomerHomepage() {
         </div>
         {/* LUXURY INFORMATION FOOTER (MAPS, CONTACT & OPERATIONAL) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-neutral-900 text-xs text-neutral-400">
-          <div className="space-y-4">
+          {/* <div className="space-y-4">
             <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">📍 BOYTAX STUDIO</h3>
             <p className="leading-relaxed font-light">Premium Men's Grooming Hub.<br />Melayani potong rambut modern, hot towel shaving, hair coloring, dan premium wash.</p>
             <div className="space-y-2 pt-2">
               <p className="flex items-center gap-2"><span>📱</span> <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
               <p className="flex items-center gap-2"><span>📞</span> <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a></p>
+              <p className="flex items-center gap-2"><span>📞</span> <a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
             </div>
-          </div>
+          </div> */}
+          <div className="space-y-2 pt-2">
+  {/* Ikon Instagram */}
+  <p className="flex items-center gap-2">
+    <span className="text-neutral-400"><FaInstagram size={16} /></span> 
+    <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a>
+  </p>
+  
+  {/* Ikon WhatsApp */}
+  <p className="flex items-center gap-2">
+    <span>📞</span> 
+    <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a>
+  </p>
+  
+  {/* Ikon TikTok */}
+  <p className="flex items-center gap-2">
+    <span className="text-neutral-400"><FaTiktok size={14} /></span> 
+    <a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a>
+  </p>
+</div>
+
 
           <div className="space-y-4">
             <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">⏰ JAM OPERASIONAL</h3>
@@ -210,11 +245,11 @@ export default function CustomerHomepage() {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">🗺️ LOKASI PREMIUM</h3>
+            <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">🗺️ LOKASI BOYTAX HAIRSTUDIO</h3>
             <div className="w-full h-32 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-md">
               <iframe src="https://google.com" className="w-full h-full border-0 grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition duration-300" allowFullScreen="" loading="lazy"></iframe>
             </div>
-            <p className="text-[10px] text-neutral-500 leading-snug">Jl. Executive Boulevard No. 24, Pusat Bisnis Premium, Kota Malang.</p>
+            <p className="text-[10px] text-neutral-500 leading-snug">Jl. Klayatan Gg. 3 No.16, Bandungrejosari, Kec. Sukun, Kota Malang, Jawa Timur 65148</p>
           </div>
         </div>
 

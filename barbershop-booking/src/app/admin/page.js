@@ -62,6 +62,7 @@ export default function AdminDashboard() {
   useEffect(() => { 
     loadAllData(); 
   }, []);
+   // FUNGSI SELESAI ANTREAN (INSTAN TANPA TUNDA)
   const handleComplete = async (id) => {
     const barberName = prompt("Siapa nama kapster yang menyelesaikan orderan ini?");
     if (barberName === null) return; 
@@ -69,16 +70,62 @@ export default function AdminDashboard() {
       alert("Nama kapster wajib diisi untuk menyelesaikan antrean!");
       return;
     }
+
+    // 🌟 OPTIMIS VISUAL: Cari data antrean yang akan diselesaikan
+    const antreanTarget = appointments.find(item => item._id === id);
+
+    if (antreanTarget) {
+      // 1. Langsung hapus dari tabel Antrean Aktif di layar
+      setAppointments(prev => prev.filter(item => item._id !== id));
+      
+      // 2. Langsung dorong ke tabel Riwayat Pemotongan Selesai di layar
+      const riwayatBaru = {
+        ...antreanTarget,
+        completedBy: barberName,
+        paymentMethod: antreanTarget.paymentMethod || 'Tunai'
+      };
+       setHistory(prev => [riwayatBaru, ...(Array.isArray(prev) ? prev : [])]);
+    }
+
+    // Jalankan operasi di server di latar belakang
     const res = await fetch(`/api/appointments?id=${id}&completedBy=${encodeURIComponent(barberName)}`, { 
       method: 'DELETE' 
     });
+    
     if (res.ok) {
-      alert("Antrean sukses dipindahkan ke riwayat!");
+      // Sinkronisasi ulang dengan database agar data ID MongoDB sinkron sempurna
+      loadAllData();
+    } else {
+      alert("Gagal memperbarui di server, memuat ulang data...");
       loadAllData();
     }
   };
 
-  const handleAddBarber = async (e) => {
+
+  // const handleAddBarber = async (e) => {
+  //   e.preventDefault();
+  //   if (!newBarberName) return;
+    
+  //   const res = await fetch('/api/barbers', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ 
+  //       name: newBarberName, 
+  //       role: newBarberRole,
+  //       image: newBarberImage || 'https://unsplash.com',
+  //       specialty: newBarberSpecialty || 'Haircut Expert'
+  //     }),
+  //   });
+    
+  //   if (res.ok) { 
+  //     setNewBarberName(''); 
+  //     setNewBarberImage('');
+  //     setNewBarberSpecialty(''); 
+  //     loadAllData(); 
+  //   }
+  // };
+
+    const handleAddBarber = async (e) => {
     e.preventDefault();
     if (!newBarberName) return;
     
@@ -93,13 +140,27 @@ export default function AdminDashboard() {
       }),
     });
     
-    if (res.ok) { 
+        if (res.ok) { 
+      const barberBaru = await res.json();
+      
+      // Mengamankan data baru agar langsung memiliki properti nama dan specialty lokal
+      const dataAman = {
+        _id: barberBaru.insertedId || barberBaru._id || Date.now().toString(),
+        name: newBarberName,
+        specialty: newBarberSpecialty || 'Haircut Expert',
+        image: newBarberImage || 'https://unsplash.com'
+      };
+
+      setBarbers(prevBarbers => [...(Array.isArray(prevBarbers) ? prevBarbers : []), dataAman]);
+      
       setNewBarberName(''); 
       setNewBarberImage('');
       setNewBarberSpecialty(''); 
       loadAllData(); 
     }
+
   };
+
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -144,23 +205,64 @@ export default function AdminDashboard() {
     setEditingBarber(barber); setEditName(barber.name); setEditSpecialty(barber.specialty || ''); setEditImage(barber.image || '');
   };
 
+    // FUNGSI HAPUS KAPSTER (INSTAN TANPA TUNDA)
   const handleDeleteBarber = async (id) => {
     if (confirm('Hapus kapster ini?')) {
+      // 🌟 OPTIMIS VISUAL: Langsung hilangkan kapster dari layar
+      setBarbers(prev => prev.filter(b => b._id !== id));
+
       const res = await fetch(`/api/barbers?id=${id}`, { method: 'DELETE' });
-      if (res.ok) loadAllData();
+      if (res.ok) {
+        loadAllData();
+      } else {
+        alert("Gagal menghapus di server, memuat ulang data...");
+        loadAllData();
+      }
     }
   };
+
+
+  // const handleAddService = async (e) => {
+  //   e.preventDefault();
+  //   if (!newServiceName || !newServicePrice) return;
+  //   const res = await fetch('/api/services', {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json' },
+  //     body: JSON.stringify({ name: newServiceName, price: newServicePrice, duration: newServiceDuration }),
+  //   });
+  //   if (res.ok) { setNewServiceName(''); setNewServicePrice(''); loadAllData(); }
+  // };
 
   const handleAddService = async (e) => {
     e.preventDefault();
     if (!newServiceName || !newServicePrice) return;
+    
     const res = await fetch('/api/services', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newServiceName, price: newServicePrice, duration: newServiceDuration }),
     });
-    if (res.ok) { setNewServiceName(''); setNewServicePrice(''); loadAllData(); }
+    
+        if (res.ok) { 
+      const serviceBaru = await res.json();
+      
+      // Mengamankan data baru agar langsung memiliki properti ID lokal
+      const dataLayananAman = {
+        _id: serviceBaru.insertedId || serviceBaru._id || Date.now().toString(),
+        name: newServiceName,
+        price: Number(newServicePrice),
+        duration: newServiceDuration || '30'
+      };
+
+      setServices(prevServices => [...(Array.isArray(prevServices) ? prevServices  :[]), dataLayananAman]);
+      
+      setNewServiceName(''); 
+      setNewServicePrice(''); 
+      loadAllData(); 
+    }
+
   };
+
 
   const handleDeleteService = async (id) => {
     if (confirm('Hapus layanan ini?')) {
@@ -293,8 +395,9 @@ export default function AdminDashboard() {
               <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold px-4 py-2 rounded-lg text-xs self-end">Tambah Kapster</button>
             </form>
             <div className="max-h-40 overflow-y-auto space-y-2 mt-4 pt-2 border-t border-neutral-800">
-              {validBarbers.map(b => (
-                <div key={b._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between items-center">
+              {validBarbers.map((b, index) => (
+  <div key={b._id || b.id || `barber-${index}-${b.name || ''}`} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between items-center">
+
                   <div className="flex items-center gap-3">
                     <img src={b.image || 'https://unsplash.com'} alt="" className="w-8 h-8 rounded-full object-cover" />
                     <div><div className="font-semibold">{b.name}</div><div className="text-[9px] text-amber-500">{b.specialty || 'Haircut Expert'}</div></div>
@@ -314,11 +417,32 @@ export default function AdminDashboard() {
               <input type="number" required placeholder="Harga" className="bg-neutral-950 border border-neutral-800 rounded-lg p-2 text-xs" value={newServicePrice} onChange={(e) => setNewServicePrice(e.target.value)} />
               <button type="submit" className="bg-amber-500 text-neutral-950 font-bold rounded-lg text-xs">Tambah</button>
             </form>
-            <div className="max-h-32 overflow-y-auto space-y-2">
-              {validServices.map(s => (
-                <div key={s._id} className="bg-neutral-950 p-2 rounded border border-neutral-800 text-xs flex justify-between">{s.name} (Rp {s.price}) <button type="button" onClick={() => handleDeleteService(s._id)} className="text-red-400">❌</button></div>
-              ))}
-            </div>
+                      <div className="max-h-32 overflow-y-auto space-y-2">
+            {validServices.map((s, index) => (
+              <div 
+                key={s._id || s.id || `service-${index}-${s.name || ''}`} 
+                className="bg-neutral-950 p-2.5 rounded border border-neutral-800 text-xs flex justify-between items-center group hover:border-red-500/30 transition-all duration-200"
+              >
+                {/* Informasi Nama dan Harga Layanan */}
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                  <span className="text-neutral-300 font-medium">
+                    {s.name} <span className="text-neutral-500">—</span> <span className="text-amber-500 font-mono">Rp {Number(s.price || 0).toLocaleString('id-ID')}</span>
+                  </span>
+                </div>
+
+                {/* Tombol Aksi Hapus Layanan */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteService(s._id || s.id)}
+                  className="text-neutral-500 hover:text-red-400 bg-neutral-900 hover:bg-red-500/10 border border-neutral-800 hover:border-red-500/30 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-150"
+                >
+                  ❌ Hapus
+                </button>
+              </div>
+            ))}
+          </div>
+
           </div>
         </div>
 
