@@ -13,9 +13,14 @@ export default function CustomerHomepage() {
   const [activeAppointments, setActiveAppointments] = useState([]);
 
   const [selectedBarber, setSelectedBarber] = useState(null);
+  
+  // State untuk melacak popup modal independen menu treatment
+  const [treatmentModal, setTreatmentModal] = useState(null);
+
   const [bookingForm, setBookingForm] = useState({
     customerName: '',
     service: '',
+    barberName: '', // Menampung kapster pilihan pada modal treatment
     paymentMethod: 'Tunai'
   });
   async function loadData() {
@@ -49,10 +54,15 @@ export default function CustomerHomepage() {
   useEffect(() => {
     loadData();
   }, []);
-    const handleBookingSubmit = async (e) => {
+  const handleBookingSubmit = async (e) => {
     e.preventDefault();
-    if (!bookingForm.customerName || !bookingForm.service || !bookingDate || !bookingTime) {
-      alert("Mohon lengkapi nama, layanan, tanggal, dan jam kunjungan!");
+    
+    // Deteksi otomatis apakah pemesanan bersumber dari kartu kapster atau kartu treatment
+    const namaKapsterTarget = selectedBarber ? selectedBarber.name : bookingForm.barberName;
+    const objekKapsterTarget = barbers.find(b => b.name === namaKapsterTarget);
+    
+    if (!bookingForm.customerName || !bookingForm.service || !namaKapsterTarget || !bookingDate || !bookingTime) {
+      alert("Mohon lengkapi nama, layanan, kapster, tanggal, dan jam kunjungan!");
       return;
     }
 
@@ -63,19 +73,14 @@ export default function CustomerHomepage() {
 
     try {
       let response;
-      
-      // Ambil string ID kapster secara aman (mendukung format teks biasa maupun $oid MongoDB)
-      const stringIdBarber = selectedBarber._id?.$oid || selectedBarber._id?.toString() || '';
+      const stringIdBarber = objekKapsterTarget ? (objekKapsterTarget._id?.$oid || objekKapsterTarget._id?.toString() || '') : '';
 
       if (bookingForm.paymentMethod === 'QRIS') {
         const formDataToSend = new FormData();
         formDataToSend.append('name', bookingForm.customerName);
         formDataToSend.append('service', bookingForm.service);
-        
-        // 🔒 AMAN: Bersihkan nama dari spasi ujung & kirim ID kapster sekalian
-        formDataToSend.append('barber', selectedBarber.name.trim());
+        formDataToSend.append('barber', namaKapsterTarget.trim());
         formDataToSend.append('barberId', stringIdBarber);
-        
         formDataToSend.append('date', bookingDate); 
         formDataToSend.append('time', bookingTime); 
         formDataToSend.append('paymentMethod', 'QRIS');
@@ -89,14 +94,11 @@ export default function CustomerHomepage() {
           body: JSON.stringify({
             name: bookingForm.customerName,
             service: bookingForm.service,
-            
-            // 🔒 AMAN: Bersihkan nama dari spasi ujung & kirim ID kapster sekalian
-            barber: selectedBarber.name.trim(),
+            barber: namaKapsterTarget.trim(),
             barberId: stringIdBarber,
-            
             date: bookingDate, 
             time: bookingTime, 
-            paymentMethod: 'Tunai'
+            paymentMethod: bookingForm.paymentMethod
           })
         });
       }
@@ -106,10 +108,11 @@ export default function CustomerHomepage() {
       if (response.ok) {
         alert(`🎉 Sukses: ${result.message || 'Antrean berhasil dipesan!'}`);
         setSelectedBarber(null);
+        setTreatmentModal(null);
         setBookingDate('');
         setBookingTime('');
         setPaymentProofFile(null);
-        setBookingForm({ customerName: '', service: '', paymentMethod: 'Tunai' });
+        setBookingForm({ customerName: '', service: '', barberName: '', paymentMethod: 'Tunai' });
         loadData(); 
       } else {
         alert(`⚠️ Peringatan: ${result.message || 'Gagal melakukan pemesanan.'}`);
@@ -119,7 +122,6 @@ export default function CustomerHomepage() {
       alert("⚠️ Terjadi gangguan koneksi ke server.");
     }
   };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-400 flex items-center justify-center font-sans">
@@ -203,8 +205,7 @@ export default function CustomerHomepage() {
             ))}
           </div>
         </div>
-
-        {/* ✂️ SIGNATURE RITUALS: MORE TREATMENT SHOWCASE WITH ACTIONS */}
+        {/* 🎨 SIGNATURE RITUALS: MORE TREATMENT SHOWCASE */}
         <div className="space-y-8 pt-4">
           <div className="flex flex-col sm:flex-row justify-between items-center border-b border-neutral-800 pb-4 gap-2">
             <h2 className="text-sm font-bold text-neutral-300 tracking-[0.2em] uppercase flex items-center gap-2.5">
@@ -212,12 +213,11 @@ export default function CustomerHomepage() {
               ✨ MORE PREMIUM TREATMENTS
             </h2>
             <span className="text-[10px] font-mono text-amber-500/70 bg-amber-500/5 px-2.5 py-1 rounded-md border border-amber-500/10">
-              EXPLORE RITUALS
+              PAY AT THE SHOP ACTIVE
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
             {/* 1. LAYANAN COLORING */}
             <div className="group bg-neutral-900 border border-neutral-800/60 rounded-2xl p-6 space-y-4 hover:border-amber-500/40 hover:bg-neutral-900/40 transition duration-300 shadow-xl relative overflow-hidden flex flex-col justify-between">
               <div className="space-y-3">
@@ -225,25 +225,22 @@ export default function CustomerHomepage() {
                   <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🎨</span>
                   <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">Trending</span>
                 </div>
-                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
-                  Premium Coloring
-                </h3>
-                <p className="text-neutral-400 text-xs leading-relaxed font-light">
-                  Ubah karakter visual Anda dengan pilihan warna internasional seperti *Ash Grey, Platinum Blonde*, atau penutupan uban alami (*Grey Coverage*) berkadar amonia rendah.
-                </p>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">Premium Coloring</h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">Ubah karakter visual Anda dengan pilihan warna internasional berkadar amonia rendah yang aman bagi kulit kepala.</p>
                 <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
                   <span>⏱️ ± 90 - 120 Menit</span>
-                  <span className="text-amber-500/90 font-bold">Mulai Rp 150k</span>
+                  <span className="text-amber-400 font-bold">Mulai Rp 150k</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                  setTreatmentModal({ name: 'Premium Coloring' });
+                  setBookingForm(prev => ({ ...prev, service: 'Premium Coloring', paymentMethod: 'Tunai' }));
                 }}
                 className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
               >
-                ⚡ Pilih Artist & Pesan
+                📅 Order Now
               </button>
             </div>
 
@@ -254,25 +251,22 @@ export default function CustomerHomepage() {
                   <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🌀</span>
                   <span className="text-[9px] font-bold text-neutral-400 bg-neutral-800 border border-neutral-700 px-2 py-0.5 rounded">Volume Cut</span>
                 </div>
-                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
-                  Gentleman Perm
-                </h3>
-                <p className="text-neutral-400 text-xs leading-relaxed font-light">
-                  Teknik pengeritingan modern untuk menghasilkan tekstur gelombang rambut alami (*Down Perm / Loose Perm*) agar rambut tampak bervolume dan mudah ditata.
-                </p>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">Gentleman Perm</h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">Teknik pengeritingan modern untuk menghasilkan tekstur gelombang rambut alami agar rambut tampak bervolume.</p>
                 <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
                   <span>⏱️ ± 60 - 90 Menit</span>
-                  <span className="text-amber-500/90 font-bold">Mulai Rp 200k</span>
+                  <span className="text-amber-400 font-bold">Mulai Rp 200k</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                  setTreatmentModal({ name: 'Gentleman Perm' });
+                  setBookingForm(prev => ({ ...prev, service: 'Gentleman Perm', paymentMethod: 'Tunai' }));
                 }}
                 className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
               >
-                ⚡ Pilih Artist & Pesan
+                📅 Kunci Waktu Ritual
               </button>
             </div>
 
@@ -283,64 +277,33 @@ export default function CustomerHomepage() {
                   <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🛡️</span>
                   <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">Healthy</span>
                 </div>
-                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
-                  Keratin Smooth Therapy
-                </h3>
-                <p className="text-neutral-400 text-xs leading-relaxed font-light">
-                  Nutrisi intensif untuk mengembalikan protein alami rambut. Sangat direkomendasikan untuk menjinakkan rambut rusak, kaku, mengembang, atau kasar.
-                </p>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">Keratin Smooth Therapy</h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">Nutrisi protein alami rambut. Sangat direkomendasikan untuk menyehatkan rambut kering, rusak, atau mengembang.</p>
                 <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
                   <span>⏱️ ± 45 Menit</span>
-                  <span className="text-amber-500/90 font-bold">Mulai Rp 120k</span>
+                  <span className="text-amber-400 font-bold">Mulai Rp 120k</span>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => {
-                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                  setTreatmentModal({ name: 'Keratin Smooth Therapy' });
+                  setBookingForm(prev => ({ ...prev, service: 'Keratin Smooth Therapy', paymentMethod: 'Tunai' }));
                 }}
                 className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
               >
-                ⚡ Pilih Artist & Pesan
+                📅 Kunci Waktu Ritual
               </button>
             </div>
-
           </div>
         </div>
-
-
-
         {/* LUXURY INFORMATION FOOTER (MAPS, CONTACT & OPERATIONAL) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-neutral-900 text-xs text-neutral-400">
-          {/* <div className="space-y-4">
-            <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">📍 BOYTAX STUDIO</h3>
-            <p className="leading-relaxed font-light">Premium Men's Grooming Hub.<br />Melayani potong rambut modern, hot towel shaving, hair coloring, dan premium wash.</p>
-            <div className="space-y-2 pt-2">
-              <p className="flex items-center gap-2"><span>📱</span> <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
-              <p className="flex items-center gap-2"><span>📞</span> <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a></p>
-              <p className="flex items-center gap-2"><span>📞</span> <a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
-            </div>
-          </div> */}
           <div className="space-y-2 pt-2">
-  {/* Ikon Instagram */}
-  <p className="flex items-center gap-2">
-    <span className="text-neutral-400"><FaInstagram size={16} /></span> 
-    <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a>
-  </p>
-  
-  {/* Ikon WhatsApp */}
-  <p className="flex items-center gap-2">
-    <span>📞</span> 
-    <a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a>
-  </p>
-  
-  {/* Ikon TikTok */}
-  <p className="flex items-center gap-2">
-    <span className="text-neutral-400"><FaTiktok size={14} /></span> 
-    <a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a>
-  </p>
-</div>
-
+            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaInstagram size={16} /></span><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
+            <p className="flex items-center gap-2"><span>📞</span><a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a></p>
+            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaTiktok size={14} /></span><a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
+          </div>
 
           <div className="space-y-4">
             <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">⏰ JAM OPERASIONAL</h3>
@@ -351,71 +314,164 @@ export default function CustomerHomepage() {
             </div>
           </div>
 
+          {/* 🌟 SEGMEN PETA MAPS FIX: DIJAMIN 100% INSTAN NGELINK GOOGLE MAPS */}
           <div className="space-y-3">
             <h3 className="text-neutral-200 font-bold uppercase tracking-wider text-amber-500">🗺️ LOKASI BOYTAX HAIRSTUDIO</h3>
-            <div className="w-full h-32 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-md">
-              <iframe src="https://google.com" className="w-full h-full border-0 grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition duration-300" allowFullScreen="" loading="lazy"></iframe>
-            </div>
-            <p className="text-[10px] text-neutral-500 leading-snug">Jl. Klayatan Gg. 3 No.16, Bandungrejosari, Kec. Sukun, Kota Malang, Jawa Timur 65148</p>
+            
+            {/* Tautan langsung diarahkan ke pencarian lokasi spesifik Boytax Hairstudio Malang */}
+                        {/* 🗺️ TERBARU: AKTOR UTAMA PETA EMED RESMI & INTEGRASI KANVAS KLIK */}
+            <a 
+              href="https://maps.app.goo.gl/W75FCs5FYRcKwRo79" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="block w-full h-32 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-md group relative cursor-pointer"
+            >
+              {/* 🔒 LAPISAN PELINDUNG (OVERLAY): Memberikan penanda interaktif visual premium */}
+              <div className="absolute inset-0 bg-neutral-950/10 group-hover:bg-neutral-950/40 transition duration-300 flex items-center justify-center z-20">
+                <span className="text-[10px] font-bold tracking-widest text-amber-500 bg-neutral-950/90 px-3 py-1.5 rounded-lg border border-amber-500/20 opacity-0 group-hover:opacity-100 transition duration-300 shadow-xl">
+                  🗺️ BUKA DI GOOGLE MAPS
+                </span>
+              </div>
+              
+              {/* 🌟 EMBED SOURCE FIX: Merender visualisasi peta Sukun Malang secara riil */}
+              <iframe 
+                src="https://google.com" 
+                className="w-full h-full border-0 grayscale opacity-70 group-hover:opacity-90 group-hover:grayscale-0 transition duration-500 pointer-events-none z-10" 
+                loading="lazy"
+              ></iframe>
+            </a>
+
+            <p className="text-[10px] text-neutral-500 leading-snug">
+              Jl. Klayatan Gg. 3 No.16, Bandungrejosari, Kec. Sukun, Kota Malang, Jawa Timur 65148
+            </p>
           </div>
         </div>
+
 
         <div className="text-center text-[10px] text-neutral-600 font-mono pt-4 border-t border-neutral-900">
           © {new Date().getFullYear()} BOYTAX HAIRSTUDIO. ALL RIGHTS RESERVED.
         </div>
+      </div>
+      {/* JENDELA 1: POPUP MODAL DIALOG PEMESANAN VIA KAPSTER */}
+      {selectedBarber && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent"></div>
+            <div className="flex justify-between items-start border-b border-neutral-800 pb-3">
+              <div><h3 className="text-md font-serif font-bold text-neutral-100">Konfirmasi Janji Temu</h3><p className="text-xs text-amber-500 font-medium">Hair Artist: {selectedBarber.name}</p></div>
+              <button onClick={() => { setSelectedBarber(null); setPaymentProofFile(null); }} className="text-neutral-500 hover:text-neutral-200 text-lg">✕</button>
+            </div>
 
-        {/* POPUP MODAL DIALOG PEMESANAN */}
-        {selectedBarber && (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
-            <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent"></div>
-              <div className="flex justify-between items-start border-b border-neutral-800 pb-3">
-                <div><h3 className="text-md font-serif font-bold text-neutral-100">Konfirmasi Janji Temu</h3><p className="text-xs text-amber-500 font-medium">Hair Artist: {selectedBarber.name}</p></div>
-                <button onClick={() => { setSelectedBarber(null); setPaymentProofFile(null); }} className="text-neutral-500 hover:text-neutral-200 text-lg">✕</button>
+            <form onSubmit={handleBookingSubmit} className="space-y-4">
+              <input type="text" required placeholder="Nama Lengkap Gentleman..." className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-100 focus:border-amber-500 focus:outline-none" value={bookingForm.customerName} onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })} />
+              <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingForm.service} onChange={(e) => setBookingForm({ ...bookingForm, service: e.target.value })} >
+                <option value="">-- Pilih Layanan Perawatan --</option>
+                {services.map((s) => <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>{s.name} - Rp {s.price.toLocaleString('id-ID')}</option>)}
+              </select>
+              <input type="date" required min={(() => { const h = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`; })()} max={(() => { const m = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); m.setDate(m.getDate() + 7); return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`; })()} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setBookingTime(''); }} />
+              
+              {bookingDate && (
+                <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none font-mono" value={bookingTime} onChange={(e) => setBookingTime(e.target.value)}>
+                  <option value="">-- Pilih Jam Slot --</option>
+                  {jamOperasional.filter(jam => {
+                    const cur = (parseInt(jam.split(':')[0], 10) * 60) + parseInt(jam.split(':')[1], 10);
+                    const hari = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(`${bookingDate}T00:00:00`).getDay()];
+                    const sibuk = blockedSlots.filter(s => (s.barberId === selectedBarber._id.toString() || s.barberId === selectedBarber._id) && s.day === hari);
+                    const isB = sibuk.some(s => {
+                      const st = (parseInt(s.startTime.split(':')[0], 10) * 60) + parseInt(s.startTime.split(':')[1], 10);
+                      const ed = (parseInt(s.endTime.split(':')[0], 10) * 60) + parseInt(s.endTime.split(':')[1], 10);
+                      return st > ed ? (cur >= ed && cur <= st) : (cur >= st && cur <= ed);
+                    });
+                    const isA = activeAppointments.some(a => a.barber === selectedBarber.name && a.date === bookingDate && a.time.substring(0, 5) === jam && a.status === 'Active');
+                    return !isB && !isA;
+                  }).map(jam => <option key={jam} value={jam}>{jam} WIB</option>)}
+                </select>
+              )}
+              <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+                <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'Tunai' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => { setBookingForm({ ...bookingForm, paymentMethod: 'Tunai' }); setPaymentProofFile(null); }}>💵 TUNAI</button>
+                <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'QRIS' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => setBookingForm({ ...bookingForm, paymentMethod: 'QRIS' })}>📱 QRIS</button>
+              </div>
+              {bookingForm.paymentMethod === 'QRIS' && (
+                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-3 text-center">
+                  <img src="https://qrserver.com" alt="QRIS" className="mx-auto bg-white p-1 rounded-lg" />
+                  <input type="file" required accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) setPaymentProofFile(e.target.files[0]); }} className="w-full text-[11px]" />
+                </div>
+              )}
+              <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black py-3.5 rounded-xl text-xs tracking-widest uppercase transition">🚀 Amankan Antrean Sekarang</button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* JENDELA 2: MODAL FORM INDEPENDEN MURNI KUNCI WAKTU TREATMENT (TANPA METODE QRIS) */}
+      {treatmentModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent"></div>
+            <div className="flex justify-between items-start border-b border-neutral-800 pb-3">
+              <div>
+                <h3 className="text-md font-serif font-bold text-neutral-100">Jadwalkan Signature Treatment</h3>
+                <p className="text-xs text-amber-500 font-medium">Layanan: {treatmentModal.name}</p>
+              </div>
+              <button onClick={() => { setTreatmentModal(null); setBookingForm(prev => ({ ...prev, barberName: '' })); }} className="text-neutral-500 hover:text-neutral-200 text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleBookingSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-1.5">Nama Lengkap</label>
+                <input type="text" required placeholder="Nama Lengkap Gentleman..." className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-100 focus:border-amber-500 focus:outline-none" value={bookingForm.customerName} onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })} />
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-1.5">Pilih Hair Artist Pelaksana</label>
+                <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingForm.barberName} onChange={(e) => setBookingForm({ ...bookingForm, barberName: e.target.value, time: '' })}>
+                  <option value="">-- Pilih Kapster --</option>
+                  {barbers.map((b) => <option key={b._id} value={b.name}>{b.name} ({b.role || 'Senior Barber'})</option>)}
+                </select>
               </div>
 
-              <form onSubmit={handleBookingSubmit} className="space-y-4">
-                <input type="text" required placeholder="Nama Lengkap Gentleman..." className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-100 focus:border-amber-500 focus:outline-none" value={bookingForm.customerName} onChange={(e) => setBookingForm({ ...bookingForm, customerName: e.target.value })} />
-                <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingForm.service} onChange={(e) => setBookingForm({ ...bookingForm, service: e.target.value })} >
-                  <option value="">-- Pilih Layanan Perawatan --</option>
-                  {services.map((s) => <option key={s._id} value={`${s.name} (Rp ${s.price.toLocaleString('id-ID')})`}>{s.name} - Rp {s.price.toLocaleString('id-ID')}</option>)}
-                </select>
+              <div>
+                <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-1.5">Tanggal Kunjungan</label>
                 <input type="date" required min={(() => { const h = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`; })()} max={(() => { const m = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); m.setDate(m.getDate() + 7); return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`; })()} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setBookingTime(''); }} />
-                
-                {bookingDate && (
+              </div>
+              {bookingDate && bookingForm.barberName && (
+                <div>
+                  <label className="block text-[10px] font-bold tracking-widest text-amber-500 uppercase mb-1.5">Pilih Jam Slot Kunjungan</label>
                   <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none font-mono" value={bookingTime} onChange={(e) => setBookingTime(e.target.value)}>
-                    <option value="">-- Pilih Jam Slot --</option>
+                    <option value="">-- Pilih Jam Kunjungan --</option>
                     {(() => {
+                      const targetBarberObj = barbers.find(b => b.name === bookingForm.barberName);
+                      if (!targetBarberObj) return null;
                       const jamOperasional = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'];
-                      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                      const hari = days[new Date(`${bookingDate}T00:00:00`).getDay()];
-                      const sibuk = blockedSlots ? blockedSlots.filter(s => (s.barberId === selectedBarber._id.toString() || s.barberId === selectedBarber._id) && s.day === hari) : [];
-                      const toMin = (t) => { const [h, m] = t.split(':'); return (parseInt(h,10)*60)+parseInt(m,10); };
+                      const hari = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(`${bookingDate}T00:00:00`).getDay()];
+                      const sibuk = blockedSlots.filter(s => (s.barberId === targetBarberObj._id.toString() || s.barberId === targetBarberObj._id) && s.day === hari);
                       return jamOperasional.filter(jam => {
-                        const cur = toMin(jam);
-                        const isB = sibuk.some(s => { const st = toMin(s.startTime); const ed = toMin(s.endTime); return st > ed ? (cur >= ed && cur <= st) : (cur >= st && cur <= ed); });
-                        const isA = activeAppointments.some(a => a.barber === selectedBarber.name && a.date === bookingDate && a.time.substring(0, 5) === jam && a.status === 'Active');
+                        const cur = (parseInt(jam.split(':')[0], 10) * 60) + parseInt(jam.split(':')[1], 10);
+                        const isB = sibuk.some(s => {
+                          const st = (parseInt(s.startTime.split(':')[0], 10) * 60) + parseInt(s.startTime.split(':')[1], 10);
+                          const ed = (parseInt(s.endTime.split(':')[0], 10) * 60) + parseInt(s.endTime.split(':')[1], 10);
+                          return st > ed ? (cur >= ed && cur <= st) : (cur >= st && cur <= ed);
+                        });
+                        const isA = activeAppointments.some(a => a.barber === bookingForm.barberName && a.date === bookingDate && a.time.substring(0, 5) === jam && a.status === 'Active');
                         return !isB && !isA;
                       }).map(jam => <option key={jam} value={jam}>{jam} WIB</option>);
                     })()}
                   </select>
-                )}
-                <div className="grid grid-cols-2 gap-3 text-xs font-bold">
-                  <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'Tunai' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => { setBookingForm({ ...bookingForm, paymentMethod: 'Tunai' }); setPaymentProofFile(null); }}>💵 TUNAI</button>
-                  <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'QRIS' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => setBookingForm({ ...bookingForm, paymentMethod: 'QRIS' })}>📱 QRIS</button>
                 </div>
-                {bookingForm.paymentMethod === 'QRIS' && (
-                  <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-3 text-center">
-                    <img src="https://qrserver.com" alt="QRIS" className="mx-auto bg-white p-1 rounded-lg" />
-                    <input type="file" required accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) setPaymentProofFile(e.target.files[0]); }} className="w-full text-[11px]" />
-                  </div>
-                )}
-                <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black py-3.5 rounded-xl text-xs tracking-widest uppercase transition">🚀 Amankan Antrean Sekarang</button>
-              </form>
-            </div>
+              )}
+
+              <div className="bg-neutral-950 border border-neutral-800/80 p-3 rounded-xl text-center border-dashed">
+                <p className="text-[10px] text-amber-500 leading-relaxed font-light">
+                  ✨ <strong>Ritual Tanpa Uang Muka (DP).</strong> Anda hanya memesan kuota slot waktu kapster secara online. Pembayaran dilakukan secara tunai/cash langsung di kasir studio setelah ritual selesai.
+                </p>
+              </div>
+
+              <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black py-3.5 rounded-xl text-xs tracking-widest uppercase transition">
+                🚀 Kunci Kursi Treatment
+              </button>
+            </form>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
