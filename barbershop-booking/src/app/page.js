@@ -203,6 +203,113 @@ export default function CustomerHomepage() {
             ))}
           </div>
         </div>
+
+        {/* ✂️ SIGNATURE RITUALS: MORE TREATMENT SHOWCASE WITH ACTIONS */}
+        <div className="space-y-8 pt-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center border-b border-neutral-800 pb-4 gap-2">
+            <h2 className="text-sm font-bold text-neutral-300 tracking-[0.2em] uppercase flex items-center gap-2.5">
+              <span className="w-1 h-3.5 bg-amber-500 rounded-full shadow-[0_0_8px_#f59e0b]"></span>
+              ✨ MORE PREMIUM TREATMENTS
+            </h2>
+            <span className="text-[10px] font-mono text-amber-500/70 bg-amber-500/5 px-2.5 py-1 rounded-md border border-amber-500/10">
+              EXPLORE RITUALS
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. LAYANAN COLORING */}
+            <div className="group bg-neutral-900 border border-neutral-800/60 rounded-2xl p-6 space-y-4 hover:border-amber-500/40 hover:bg-neutral-900/40 transition duration-300 shadow-xl relative overflow-hidden flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🎨</span>
+                  <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">Trending</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
+                  Premium Coloring
+                </h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">
+                  Ubah karakter visual Anda dengan pilihan warna internasional seperti *Ash Grey, Platinum Blonde*, atau penutupan uban alami (*Grey Coverage*) berkadar amonia rendah.
+                </p>
+                <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
+                  <span>⏱️ ± 90 - 120 Menit</span>
+                  <span className="text-amber-500/90 font-bold">Mulai Rp 150k</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                }}
+                className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
+              >
+                ⚡ Pilih Artist & Pesan
+              </button>
+            </div>
+
+            {/* 2. LAYANAN PERM */}
+            <div className="group bg-neutral-900 border border-neutral-800/60 rounded-2xl p-6 space-y-4 hover:border-amber-500/40 hover:bg-neutral-900/40 transition duration-300 shadow-xl relative overflow-hidden flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🌀</span>
+                  <span className="text-[9px] font-bold text-neutral-400 bg-neutral-800 border border-neutral-700 px-2 py-0.5 rounded">Volume Cut</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
+                  Gentleman Perm
+                </h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">
+                  Teknik pengeritingan modern untuk menghasilkan tekstur gelombang rambut alami (*Down Perm / Loose Perm*) agar rambut tampak bervolume dan mudah ditata.
+                </p>
+                <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
+                  <span>⏱️ ± 60 - 90 Menit</span>
+                  <span className="text-amber-500/90 font-bold">Mulai Rp 200k</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                }}
+                className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
+              >
+                ⚡ Pilih Artist & Pesan
+              </button>
+            </div>
+
+            {/* 3. LAYANAN KERATIN */}
+            <div className="group bg-neutral-900 border border-neutral-800/60 rounded-2xl p-6 space-y-4 hover:border-amber-500/40 hover:bg-neutral-900/40 transition duration-300 shadow-xl relative overflow-hidden flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex justify-between items-start">
+                  <span className="text-3xl filter drop-shadow-[0_2px_8px_rgba(245,158,11,0.2)]">🛡️</span>
+                  <span className="text-[9px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">Healthy</span>
+                </div>
+                <h3 className="text-lg font-serif font-bold text-neutral-100 group-hover:text-amber-500 transition duration-200">
+                  Keratin Smooth Therapy
+                </h3>
+                <p className="text-neutral-400 text-xs leading-relaxed font-light">
+                  Nutrisi intensif untuk mengembalikan protein alami rambut. Sangat direkomendasikan untuk menjinakkan rambut rusak, kaku, mengembang, atau kasar.
+                </p>
+                <div className="pt-2 flex justify-between items-center font-mono text-[10px] text-neutral-500">
+                  <span>⏱️ ± 45 Menit</span>
+                  <span className="text-amber-500/90 font-bold">Mulai Rp 120k</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  window.scrollTo({ top: 400, behavior: 'smooth' });
+                }}
+                className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
+              >
+                ⚡ Pilih Artist & Pesan
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+
+
         {/* LUXURY INFORMATION FOOTER (MAPS, CONTACT & OPERATIONAL) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-neutral-900 text-xs text-neutral-400">
           {/* <div className="space-y-4">
