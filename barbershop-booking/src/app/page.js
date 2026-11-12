@@ -54,10 +54,31 @@ export default function CustomerHomepage() {
   useEffect(() => {
     loadData();
   }, []);
+  // 🌟 FUNGSI BARU: Mengunduh gambar QR Code secara langsung ke perangkat pelanggan
+  const handleDownloadQR = async () => {
+    try {
+      // ✅ GANTI URL LAMA DENGAN NAMA FILE DI FOLDER PUBLIC ANDA:
+      const qrUrl = "/qris-boytax.jpg"; 
+      
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'QRIS-Boytax-Barber.jpg'; // Sesuaikan ekstensi (.jpg / .png)
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert("Gagal mengunduh QR Code, silakan tahan/screenshot gambar QR secara manual.");
+    }
+  };
+
+
   const handleBookingSubmit = async (e) => {
     e.preventDefault();
     
-    // Deteksi otomatis apakah pemesanan bersumber dari kartu kapster atau kartu treatment
     const namaKapsterTarget = selectedBarber ? selectedBarber.name : bookingForm.barberName;
     const objekKapsterTarget = barbers.find(b => b.name === namaKapsterTarget);
     
@@ -122,6 +143,8 @@ export default function CustomerHomepage() {
       alert("⚠️ Terjadi gangguan koneksi ke server.");
     }
   };
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-400 flex items-center justify-center font-sans">
@@ -266,7 +289,7 @@ export default function CustomerHomepage() {
                 }}
                 className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
               >
-                📅 Kunci Waktu Ritual
+                📅 Order Now
               </button>
             </div>
 
@@ -292,7 +315,7 @@ export default function CustomerHomepage() {
                 }}
                 className="w-full bg-neutral-950 hover:bg-amber-500 text-amber-500 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500 font-bold py-2.5 rounded-xl text-[10px] tracking-wider uppercase transition-all duration-300 mt-4"
               >
-                📅 Kunci Waktu Ritual
+                📅 Order Now
               </button>
             </div>
           </div>
@@ -300,8 +323,8 @@ export default function CustomerHomepage() {
         {/* LUXURY INFORMATION FOOTER (MAPS, CONTACT & OPERATIONAL) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-12 border-t border-neutral-900 text-xs text-neutral-400">
           <div className="space-y-2 pt-2">
-            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaInstagram size={16} /></span><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
-            <p className="flex items-center gap-2"><span>📞</span><a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 812-3456-7890</a></p>
+            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaInstagram size={16} /></span><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxbarber.co</a></p>
+            <p className="flex items-center gap-2"><span>📞</span><a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 895-1020-4917</a></p>
             <p className="flex items-center gap-2"><span className="text-neutral-400"><FaTiktok size={14} /></span><a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
           </div>
 
@@ -370,33 +393,74 @@ export default function CustomerHomepage() {
               </select>
               <input type="date" required min={(() => { const h = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); return `${h.getFullYear()}-${String(h.getMonth() + 1).padStart(2, '0')}-${String(h.getDate()).padStart(2, '0')}`; })()} max={(() => { const m = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Jakarta"})); m.setDate(m.getDate() + 7); return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`; })()} className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none" value={bookingDate} onChange={(e) => { setBookingDate(e.target.value); setBookingTime(''); }} />
               
-              {bookingDate && (
+                            {bookingDate && (
                 <select required className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-200 focus:border-amber-500 focus:outline-none font-mono" value={bookingTime} onChange={(e) => setBookingTime(e.target.value)}>
                   <option value="">-- Pilih Jam Slot --</option>
-                  {jamOperasional.filter(jam => {
-                    const cur = (parseInt(jam.split(':')[0], 10) * 60) + parseInt(jam.split(':')[1], 10);
-                    const hari = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(`${bookingDate}T00:00:00`).getDay()];
-                    const sibuk = blockedSlots.filter(s => (s.barberId === selectedBarber._id.toString() || s.barberId === selectedBarber._id) && s.day === hari);
-                    const isB = sibuk.some(s => {
-                      const st = (parseInt(s.startTime.split(':')[0], 10) * 60) + parseInt(s.startTime.split(':')[1], 10);
-                      const ed = (parseInt(s.endTime.split(':')[0], 10) * 60) + parseInt(s.endTime.split(':')[1], 10);
-                      return st > ed ? (cur >= ed && cur <= st) : (cur >= st && cur <= ed);
-                    });
-                    const isA = activeAppointments.some(a => a.barber === selectedBarber.name && a.date === bookingDate && a.time.substring(0, 5) === jam && a.status === 'Active');
-                    return !isB && !isA;
-                  }).map(jam => <option key={jam} value={jam}>{jam} WIB</option>)}
+                  {(() => {
+                    const jamOperasional = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00', '20:30'];
+                    return jamOperasional.filter(jam => {
+                      const cur = (parseInt(jam.split(':')[0], 10) * 60) + parseInt(jam.split(':')[1], 10);
+                      const hari = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(`${bookingDate}T00:00:00`).getDay()];
+                      const sibuk = blockedSlots.filter(s => (s.barberId === selectedBarber._id.toString() || s.barberId === selectedBarber._id) && s.day === hari);
+                      const isB = sibuk.some(s => {
+                        const st = (parseInt(s.startTime.split(':')[0], 10) * 60) + parseInt(s.startTime.split(':')[1], 10);
+                        const ed = (parseInt(s.endTime.split(':')[0], 10) * 60) + parseInt(s.endTime.split(':')[1], 10);
+                        return st > ed ? (cur >= ed && cur <= st) : (cur >= st && cur <= ed);
+                      });
+                      const isA = activeAppointments.some(a => a.barber === selectedBarber.name && a.date === bookingDate && a.time.substring(0, 5) === jam && a.status === 'Active');
+                      return !isB && !isA;
+                    }).map(jam => <option key={jam} value={jam}>{jam} WIB</option>);
+                  })()}
                 </select>
               )}
+
               <div className="grid grid-cols-2 gap-3 text-xs font-bold">
                 <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'Tunai' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => { setBookingForm({ ...bookingForm, paymentMethod: 'Tunai' }); setPaymentProofFile(null); }}>💵 TUNAI</button>
                 <button type="button" className={`p-3 rounded-xl border transition ${bookingForm.paymentMethod === 'QRIS' ? 'bg-amber-500/10 text-amber-500 border-amber-500' : 'bg-neutral-950 border-neutral-800 text-neutral-500'}`} onClick={() => setBookingForm({ ...bookingForm, paymentMethod: 'QRIS' })}>📱 QRIS</button>
               </div>
-              {bookingForm.paymentMethod === 'QRIS' && (
-                <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-3 text-center">
-                  <img src="https://qrserver.com" alt="QRIS" className="mx-auto bg-white p-1 rounded-lg" />
-                  <input type="file" required accept="image/*" onChange={(e) => { if (e.target.files && e.target.files[0]) setPaymentProofFile(e.target.files[0]); }} className="w-full text-[11px]" />
-                </div>
-              )}
+              {/* ✅ GANTI DENGAN KODE BARU INI: */}
+{bookingForm.paymentMethod === 'QRIS' && (
+  <div className="bg-neutral-950 border border-neutral-800 p-4 rounded-xl space-y-3 text-center">
+    <p className="text-[10px] text-amber-500 font-semibold tracking-wider uppercase">
+      Scan atau Unduh QRIS Pembayaran
+    </p>
+    
+    {/* Gambar QR Code Valid */}
+        {/* Gambar QRIS Asli dari Folder Public */}
+    <div className="bg-white p-2 rounded-xl w-max mx-auto shadow-md">
+      <img 
+        src="/qris-boytax.jpeg" 
+        alt="QRIS Boytax Barber" 
+        className="w-40 h-auto max-h-60 object-contain rounded-lg"
+      />
+    </div>
+
+
+    {/* Tombol Unduh QR Code */}
+    <button
+      type="button"
+      onClick={handleDownloadQR}
+      className="inline-flex items-center justify-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-amber-400 border border-neutral-700 px-3.5 py-1.5 rounded-lg text-[10px] font-bold tracking-wider uppercase transition"
+    >
+      ⬇️ Unduh QR Code
+    </button>
+
+    {/* Input Unggah Bukti Pembayaran */}
+    <div className="pt-2 border-t border-neutral-900 text-left space-y-1">
+      <label className="block text-[10px] text-neutral-400 font-medium">
+        Unggah Bukti Transfer (Wajib):
+      </label>
+      <input 
+        type="file" 
+        required 
+        accept="image/*" 
+        onChange={(e) => { if (e.target.files && e.target.files[0]) setPaymentProofFile(e.target.files[0]); }} 
+        className="w-full text-[11px] text-neutral-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-500/10 file:text-amber-500 hover:file:bg-amber-500/20 cursor-pointer" 
+      />
+    </div>
+  </div>
+)}
+
               <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-neutral-950 font-black py-3.5 rounded-xl text-xs tracking-widest uppercase transition">🚀 Amankan Antrean Sekarang</button>
             </form>
           </div>

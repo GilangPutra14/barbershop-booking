@@ -3,6 +3,9 @@ import { MongoClient } from 'mongodb';
 // MASUKKAN LINK MONGODB ATLAS ANDA LANGSUNG DI SINI
 const uri = "mongodb+srv://boytaxadmin:boytax12345@cluster0.dykme65.mongodb.net/barbershop?retryWrites=true&w=majority";
 
+// const uri = "mongodb+srv://boytaxadmin:ADMINBOYTAX123@cluster0.dykme65.mongodb.net/barbershop?retryWrites=true&w=majority";
+
+
 const options = {};
 let client;
 let clientPromise;
