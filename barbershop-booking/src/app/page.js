@@ -325,7 +325,7 @@ export default function CustomerHomepage() {
           <div className="space-y-2 pt-2">
             <p className="flex items-center gap-2"><span className="text-neutral-400"><FaInstagram size={16} /></span><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxbarber.co</a></p>
             <p className="flex items-center gap-2"><span>📞</span><a href="https://wa.me" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">+62 895-1020-4917</a></p>
-            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaTiktok size={14} /></span><a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxhairstudio</a></p>
+            <p className="flex items-center gap-2"><span className="text-neutral-400"><FaTiktok size={14} /></span><a href="https://Tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-amber-500 transition">@boytaxbarber.co</a></p>
           </div>
 
           <div className="space-y-4">
