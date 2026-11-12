@@ -212,10 +212,10 @@ export default function CustomerHomepage() {
                     <p className="text-[9px] font-bold text-amber-500/80 tracking-widest uppercase bg-amber-500/5 py-0.5 px-2 rounded w-max mx-auto border border-amber-500/10">{barber.role || 'Senior Barber'}</p>
                     <p className="text-[11px] text-neutral-400 font-light pt-0.5 italic">{barber.specialty}</p>
                   </div>
-                  <div className="flex items-center justify-center gap-1.5 bg-neutral-950/80 border border-neutral-800/60 py-1 px-3 rounded-full w-max mx-auto">
+                  {/* <div className="flex items-center justify-center gap-1.5 bg-neutral-950/80 border border-neutral-800/60 py-1 px-3 rounded-full w-max mx-auto">
                     <span className="text-amber-400 text-xs font-bold font-mono">⭐ {barber.rating}</span>
                     <span className="text-neutral-500 text-[10px]">({barber.totalReviews} Ulasan)</span>
-                  </div>
+                  </div> */}
                 </div>
 
                 <button
