@@ -162,6 +162,26 @@ export default function CustomerHomepage() {
 
       <div className="max-w-5xl mx-auto px-6 py-12 space-y-16 relative z-10">
         
+{/* 🌟 TOMBOL NAVIGASI MENUJU DASHBOARD ADMIN */}
+        {/* <div className="flex justify-end -mb-8">
+          <a 
+            href="/admin" 
+            className="inline-flex items-center gap-2 bg-neutral-900/80 hover:bg-amber-500 text-neutral-400 hover:text-neutral-950 border border-neutral-800 hover:border-amber-500/30 px-4 py-2 rounded-xl text-[10px] font-bold tracking-widest uppercase transition-all duration-300 shadow-lg backdrop-blur-sm group"
+          >
+            ⚙️ <span className="group-hover:translate-x-0.5 transition-transform duration-200">Panel Admin</span>
+          </a>
+        </div> */}
+
+                {/* 🌟 KONSEP 1: ICON GLOWING MELAYANG (FLOATING) */}
+        <a 
+          href="/admin" 
+          title="Panel Admin"
+          className="fixed top-6 right-6 w-9 h-9 flex items-center justify-center bg-neutral-900/90 hover:bg-amber-500 text-neutral-400 hover:text-neutral-950 border border-neutral-800 rounded-full transition-all duration-300 shadow-2xl backdrop-blur-md z-50 group hover:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+        >
+          <span className="text-sm transition-transform duration-300 group-hover:rotate-45">⚙️</span>
+        </a>
+
+
         {/* HERO LOGO EXECUTIVE HEADER & SLOGAN */}
         <div className="text-center space-y-4 pt-6">
           <div className="flex items-center justify-center gap-3 text-amber-500 mb-2">
@@ -170,6 +190,7 @@ export default function CustomerHomepage() {
             <span className="text-xs font-bold tracking-[0.3em] uppercase">Est. 2024</span>
             <span className="h-6 w-[1px] bg-neutral-800"></span>
             <span className="text-2xl">💈</span>
+            
           </div>
           
           <h1 className="text-5xl md:text-6xl font-black font-serif tracking-wider text-transparent bg-clip-text bg-gradient-to-b from-neutral-50 via-neutral-200 to-neutral-400">
@@ -185,6 +206,8 @@ export default function CustomerHomepage() {
           </p>
           <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-amber-500/40 to-transparent mx-auto mt-4"></div>
         </div>
+        
+        
         {/* SECTION UTAMA DAFTAR ARTIST */}
         <div className="space-y-8">
           <div className="flex flex-col sm:flex-row justify-between items-center border-b border-neutral-800 pb-4 gap-2">

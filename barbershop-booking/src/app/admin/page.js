@@ -101,6 +101,38 @@ export default function AdminDashboard() {
     }
   };
 
+    // 🌟 FUNGSI BARU: Menghapus data booking aktif yang tidak terselesaikan
+   // 🌟 FUNGSI FIX: Menghapus antrean secara paksa tanpa mengotori tabel riwayat omzet
+  const handleDeleteBooking = async (id) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus data booking ini secara permanen dari daftar antrean aktif?")) {
+      return;
+    }
+
+    // ⚡ VISUAL OPTIMIS: Langsung hapus dari layar kasir admin agar responsif
+    setAppointments(prev => prev.filter(item => item._id !== id));
+
+    try {
+      // 🔒 AMAN: Mengirim parameter bypass khusus pembatalan agar API server menerima request hapus
+      const res = await fetch(`/api/appointments?id=${id}&completedBy=${encodeURIComponent('DIBATALKAN_ADMIN')}`, { 
+        method: 'DELETE' 
+      });
+      
+      if (res.ok) {
+        // Hapus dari riwayat visual jika tidak sengaja terdorong ke history lokal browser
+        setHistory(prev => prev.filter(item => item._id !== id));
+        loadAllData();
+      } else {
+        alert("Gagal menghapus data di server, memuat ulang manifest...");
+        loadAllData();
+      }
+    } catch (err) {
+      console.error(err);
+      alert("⚠️ Terjadi gangguan koneksi ke server.");
+      loadAllData();
+    }
+  };
+
+
 
   // const handleAddBarber = async (e) => {
   //   e.preventDefault();
@@ -335,11 +367,23 @@ export default function AdminDashboard() {
 
   const dataTersortir = dapatkanDataTersortir();
 
-  const totalOmzet = validHistory.reduce((acc, curr) => acc + extractPrice(curr.service), 0);
-  const omzetTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
-  const omzetQris = validHistory.filter(item => item.paymentMethod === 'QRIS').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
-  const jumlahTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').length;
-  const jumlahQris = validHistory.filter(item => item.paymentMethod === 'QRIS').length;
+  // ✅ KODE BARU FIX: Menyaring omzet agar transaksi yang dihapus/dibatalkan diabaikan total
+  const riwayatValidBukanBatal = validHistory.filter(item => item.completedBy !== 'DIBATALKAN_ADMIN');
+
+  const totalOmzet = riwayatValidBukanBatal.reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  const omzetTunai = riwayatValidBukanBatal.filter(item => item.paymentMethod === 'Tunai').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  const omzetQris = riwayatValidBukanBatal.filter(item => item.paymentMethod === 'QRIS').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  
+  // Perbarui juga penghitung jumlah transaksi sukses di kasir
+  const jumlahTunai = riwayatValidBukanBatal.filter(item => item.paymentMethod === 'Tunai').length;
+  const jumlahQris = riwayatValidBukanBatal.filter(item => item.paymentMethod === 'QRIS').length;
+
+
+  // const totalOmzet = validHistory.reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  // const omzetTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  // const omzetQris = validHistory.filter(item => item.paymentMethod === 'QRIS').reduce((acc, curr) => acc + extractPrice(curr.service), 0);
+  // const jumlahTunai = validHistory.filter(item => item.paymentMethod === 'Tunai').length;
+  // const jumlahQris = validHistory.filter(item => item.paymentMethod === 'QRIS').length;
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 p-8 font-sans">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -552,9 +596,41 @@ export default function AdminDashboard() {
                           <span className="inline-block bg-neutral-950 text-neutral-400 text-xs px-3 py-1 rounded border border-neutral-800 font-medium">💵 Tunai / Kasir</span>
                         )}
                       </td>
-                      <td className="p-4 text-center">
+                      {/* <td className="p-4 text-center">
                         <button onClick={() => handleComplete(item._id)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition duration-200">✓ Selesai</button>
+                      </td> */}
+                                            {/* 🌟 PERBAIKAN: INTERFAS AKSI BERSAMA TOMBOL HAPUS ANTAR-MUKA */}
+                                            {/* 🌟 PERBAIKAN: KOLOM AKSI MINIMALIS HANYA IKON (UKURAN LEBIH RINGKAS) */}
+                      <td className="p-4 text-center">
+                        <div className="flex items-center gap-1.5 justify-center">
+                          
+                          {/* 🟢 Tombol Selesai (Hanya Ikon) */}
+                          <button 
+                            onClick={() => handleComplete(item._id)} 
+                            className="bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-neutral-950 border border-emerald-500/20 p-2 rounded-lg transition duration-200 shadow-sm"
+                            title="Tandai Selesai"
+                          >
+                            <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                          </button>
+                          
+                          {/* 🔴 Tombol Hapus (Hanya Ikon) */}
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteBooking(item._id)} 
+                            className="bg-rose-950/30 hover:bg-rose-600 text-rose-400 hover:text-neutral-950 border border-rose-800/30 hover:border-rose-500 p-2 rounded-lg transition duration-200 shadow-sm"
+                            title="Hapus Pemesanan"
+                          >
+                            <svg xmlns="http://w3.org" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-3.5 h-3.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+
+                        </div>
                       </td>
+
+
                     </tr>
                   ))}
                 </tbody>
